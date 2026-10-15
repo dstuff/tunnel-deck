@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+dist/
+.runtime-sources/
+Runtime/bin/
+Runtime/xray/
+*.log
+.DS_Store
+.private/

@@ -1,0 +1,25 @@
+TunnelDeck app icon variants — round 2
+Generation mode: built-in image_gen
+Status: concepts for selection; not installed in the application.
+Direction: distinct from the tunnel/arch concept rejected for similarity to Tunnelblick.
+
+04-monogram
+Use case: logo-brand.
+Asset type: standalone macOS application icon for TunnelDeck, a native VPN client.
+Primary request: a fresh alternative app icon with a bold sculptural TD monogram. The user rejected a previous tunnel arch emblem for resembling Tunnelblick. This new concept must have a completely different silhouette.
+Subject: a single beautifully integrated monogram made from the letters T and D, using thick interlocking geometric strokes and purposeful negative space. The T is upright and readable, the D is a squared, softly rounded geometric form, fused into one compact unique emblem rather than two typed characters. No archway, no doorway, no nested arches.
+Style/medium: beautifully crafted contemporary macOS app icon, restrained dimensional satin titanium and warm amber inset, crisp bevels, subtle material lighting, sophisticated utility application. Strong silhouette at tiny Dock sizes.
+Composition/framing: one icon only, straight-on view, square 1024 x 1024 composition. A dark graphite rounded-square tile centered with generous even margins and the large central monogram. Opaque square image background, clean smooth edges, no ragged cutout or scattered pixels. The background outside the rounded tile is a uniform very light neutral gray.
+Text (verbatim): "TD" as one custom integrated monogram only, no other text.
+Constraints: one finished icon concept, no mockup, no device, no desktop screenshot, no labels, no watermark, no rocket, no tunnel, no portal, no rainbow, no arch, no shield, no padlock, no decorative particles. An original distinctive composition, do not imitate existing VPN app logos.
+
+05-link
+Use case: logo-brand.
+Asset type: standalone macOS application icon for TunnelDeck, a native VPN client.
+Primary request: a fresh alternative app icon built around a secure connection symbol. The user rejected a previous tunnel arch emblem for resembling Tunnelblick. This new concept must have a completely different silhouette.
+Subject: exactly two bold oblong geometric links interlock diagonally to form a compact continuous connection. Links have squared-off softly rounded corners and very thick clean bodies, one rich cobalt blue and one soft ice-blue satin metal. They interlock convincingly and form a memorable integrated emblem with clear negative space. Almost front-facing, just enough 3D depth for overlap to read. No network nodes, no additional links.
+Style/medium: polished contemporary macOS desktop app icon, restrained tactile 3D industrial design, softly beveled metal and enamel, elegant subtle highlights, high-end practical utility, no exaggerated glow. Readable at 32 pixels.
+Composition/framing: single icon only, square 1024 x 1024 image, one porcelain-white macOS rounded-square tile centered with generous even margins, large centered two-link symbol. Opaque square image background, clean smooth edges, no ragged cutout or scattered pixels. Outside the tile use a uniform very light neutral gray.
+Text: none.
+Constraints: one final standalone icon concept, no archway, no tunnel, no portal, no nested arches, no rainbow, no doorway, no shield, no padlock, no rocket, no letters, no watermark, no mockup, no device, no presentation, no desktop screenshot, no extra icons. Original silhouette, do not imitate any existing VPN app logo.
+

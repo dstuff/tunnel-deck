@@ -1,0 +1,37 @@
+TunnelDeck app icon variants
+Generation mode: built-in image_gen
+Status: concepts for selection; not installed in the application.
+
+01-tunnel
+Use case: logo-brand.
+Asset type: standalone macOS application icon for TunnelDeck, a native VPN client.
+Primary request: create one polished original icon, concept 1 of 3: a luminous tunnel.
+Subject: a bold sculptural rounded arch / tunnel portal, with two nested thick arches suggesting a protected passage; one simple softly glowing path enters its center. An immediately recognizable iconic silhouette, restrained and beautifully balanced.
+Style/medium: refined macOS icon design, softly dimensional molded glass and satin material, deliberate geometry, beautiful edge highlights, crisp detail. Calm, trustworthy, premium desktop utility.
+Composition/framing: one icon only, straight-on view, square 1024 x 1024 composition. A single macOS rounded-square tile fills approximately 88% of the image, centered, with the symbol large and centered. Transparent area only outside the rounded-square tile. The artwork must remain clear at 32 pixels.
+Scene/backdrop: rich deep blue tile with subtle depth; cool luminous blue-cyan tunnel. Controlled studio lighting, no scenery.
+Text: none.
+Constraints: final standalone app icon asset, not a presentation, no caption, no border around the image, no device, no mockup, no desktop screenshot, no additional icons, no watermark. Do not imitate another VPN app's logo.
+
+02-shield
+Use case: logo-brand.
+Asset type: standalone macOS application icon for TunnelDeck, a native VPN client.
+Primary request: create one polished original icon, concept 2 of 3: a glass shield with a protected connection.
+Subject: a distinctive broad translucent shield, rounded friendly geometry, with a single thick continuous luminous route passing through its center and connecting two substantial circular endpoints. Keep the symbol bold and minimal, no tiny circuitry. Shield and route form one integrated sculptural emblem.
+Style/medium: refined macOS application icon, subtly dimensional frosted jade glass, finely controlled translucency, satin edges, tactile professional desktop design. Quiet confident lighting with clear separation of shapes.
+Composition/framing: one icon only, straight-on, square 1024 x 1024 composition. A single dark graphite macOS rounded-square tile fills approximately 88% of the image, centered, shield large and centered. Transparent area only outside the rounded-square tile. Must read beautifully at 32 pixels.
+Scene/backdrop: deep graphite rounded tile, restrained mint-jade shield and light route, soft studio light, no scenery.
+Text: none.
+Constraints: final standalone icon asset, no caption, no letters, no watermark, no padlock or keyhole, no device, no presentation, no desktop screenshot, no additional icons, no tiny decoration. Original emblem, do not copy other VPN brands.
+
+03-route
+Use case: logo-brand.
+Asset type: standalone macOS application icon for TunnelDeck, a native VPN client.
+Primary request: create one polished original icon, concept 3 of 3: a folded route ribbon.
+Subject: one broad continuous satin ribbon folded into an elegant compact looping passage, a strong almost-knot silhouette with a clear central negative space and two confidently cut ends. Suggest smooth private network routing and the layered structure implied by Deck. Sculptural, simple and memorable, no little network nodes.
+Style/medium: refined contemporary macOS app icon, beautifully crafted folded lavender-violet ribbon with subtle pearlescent highlights and soft realistic depth; clean soft ivory tile. Friendly premium utility, not a toy.
+Composition/framing: single icon only, square 1024 x 1024 composition, straight-on view. One macOS rounded-square ivory tile fills approximately 88% of the image, centered; bold ribbon symbol fills its center with generous clear space. Transparent area only outside the rounded-square tile. Distinct and readable at 32 pixels.
+Scene/backdrop: warm near-white ceramic tile, violet sculptural ribbon, gentle studio shading and restrained material detail, no scenery.
+Text: none.
+Constraints: final standalone application icon asset, no caption, no letters, no watermark, no border, no device, no presentation board, no desktop screenshot, no other icons, no shield, no padlock, no rocket. An original symbol that does not copy any existing app logo.
+

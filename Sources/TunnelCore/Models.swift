@@ -1,0 +1,77 @@
+import Foundation
+
+public enum VPNProtocol: String, Codable, CaseIterable, Identifiable, Sendable {
+    case openConnect, amneziaWG, xray
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .openConnect: return "OpenConnect"
+        case .amneziaWG: return "AmneziaWG 3.1"
+        case .xray: return "Xray"
+        }
+    }
+    public var symbol: String {
+        switch self {
+        case .openConnect: return "lock.shield"
+        case .amneziaWG: return "waveform.path"
+        case .xray: return "point.3.connected.trianglepath.dotted"
+        }
+    }
+}
+
+// Only non-secret profile metadata is stored in the preferences file.
+public struct VPNProfile: Codable, Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var kind: VPNProtocol
+    public var server: String
+    public var username: String
+    public var authGroup: String
+    public var certificatePin: String
+    public var disableDTLS: Bool
+
+    public init(id: UUID = UUID(), name: String = "Новое подключение", kind: VPNProtocol = .openConnect,
+                server: String = "", username: String = "", authGroup: String = "",
+                certificatePin: String = "", disableDTLS: Bool = false) {
+        self.id = id; self.name = name; self.kind = kind; self.server = server
+        self.username = username; self.authGroup = authGroup
+        self.certificatePin = certificatePin; self.disableDTLS = disableDTLS
+    }
+}
+
+public struct ProfileSecrets: Codable, Sendable {
+    public var password = ""
+    public var camouflage = ""
+    public var configuration = ""
+    // Incomplete or invalid server input belongs in Keychain, never in metadata.
+    public var serverInput: String?
+    public init() {}
+}
+
+public struct TunnelRequest: Codable, Sendable {
+    public var userID: UInt32
+    public var parentPID: Int32
+    public var profile: VPNProfile
+    public var secrets: ProfileSecrets
+    public var cookie: String
+    public init(userID: UInt32, parentPID: Int32, profile: VPNProfile, secrets: ProfileSecrets, cookie: String = "") {
+        self.userID = userID; self.parentPID = parentPID; self.profile = profile
+        self.secrets = secrets; self.cookie = cookie
+    }
+}
+
+public struct TunnelEvent: Codable, Sendable {
+    public enum Kind: String, Codable, Sendable { case log, configuring, networkReady, connected, error, stopped }
+    public var kind: Kind
+    public var message: String
+    public var timestamp: Date
+    public init(_ kind: Kind, _ message: String) {
+        self.kind = kind; self.message = message; self.timestamp = Date()
+    }
+}
+
+public struct VPNError: LocalizedError, Sendable {
+    public let message: String
+    public init(_ message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}

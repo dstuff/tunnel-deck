@@ -1,0 +1,16 @@
+Selected concept: 05-link.png (variant 5).
+Prepared master: ../../Resources/AppIcon.png
+Standalone macOS icon: ../../Resources/AppIcon.icns
+Packaging: ../../script/build_icon.sh
+Image editing mode: built-in image_gen.
+
+Final preparation prompt:
+Use case: background-extraction.
+Prepare the selected image as a professional macOS app icon with real transparency.
+Retain exactly the selected two interlocking blue and pale-blue links and the rounded-square white ceramic tile underneath them, same shapes and proportions, centered in the same square canvas.
+Change ONLY the outside edge and background treatment:
+1. The white tile has a single smooth mathematically perfect continuous rounded-square silhouette.
+2. Remove ALL exterior shadows, exterior glow, gray background, hazy border and disconnected pixels. Outside the tile is entirely empty transparent alpha.
+3. Give the tile a very fine continuous cool medium-gray rim at its OUTERMOST silhouette, approximately 2 pixels thick, to make its edge unambiguous. The rim follows perfectly smooth rounded corners. This is a clean manufactured ceramic tile, not torn paper.
+4. No wispy edges, no ragged cutout, no stray flecks or particles anywhere, no scattered white pixels. Keep the tile's interior white with its original soft shading and both links unchanged.
+Single square icon, no text, no watermark, no additional objects. Flat straight-on framing, no environment. Real transparent background, no checkerboard illustration.

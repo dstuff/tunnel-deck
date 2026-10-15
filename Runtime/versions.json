@@ -1,0 +1,37 @@
+[
+  {
+    "name": "amneziawg-go",
+    "path": "bin/amneziawg-go",
+    "version": "3.1.20260828",
+    "source": "https://github.com/amnezia-vpn/amneziawg-go/tree/v3.1.20260828",
+    "sha256": "a8fe0d43a09965b6bb70102aa231a5609cb47d675c921d2d146c7b4c8d3e7080"
+  },
+  {
+    "name": "awg",
+    "path": "bin/awg",
+    "version": "3.1.20260812",
+    "source": "https://github.com/amnezia-vpn/amneziawg-tools/tree/v3.1.20260812",
+    "sha256": "edc3a8e7ef7d5ca8ad0df6adfdf9d5ed74295a8e8915fd41758ef45e9c11af12"
+  },
+  {
+    "name": "xray",
+    "path": "xray/xray",
+    "version": "26.3.27+tunneldeck.1",
+    "source": "https://github.com/XTLS/Xray-core/tree/v26.3.27",
+    "sha256": "ef4dcf1839b70d56583bbeb23de1d9977694f671e8eab3a98b4826f9d6f2cbe5",
+    "distribution": "TunnelDeck modified source build",
+    "sourceArchive": "https://github.com/XTLS/Xray-core/archive/refs/tags/v26.3.27.tar.gz",
+    "sourceArchiveSha256": "992a4997e6bb846d11469435d687f99ef812fcde1e0a009bb8e95189ea20331d",
+    "patch": "script/xray_compat.patch",
+    "patchSha256": "a87d036fa9d3ba8653e4b1cd4f4d3a99c456f0165133161a4602a70272d3a9ae",
+    "toolchain": "go1.26.0",
+    "buildScript": "script/build_xray_compat.sh"
+  },
+  {
+    "name": "hev-socks5-tunnel",
+    "path": "bin/hev-socks5-tunnel",
+    "version": "2.19.0",
+    "source": "https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.19.0",
+    "sha256": "c72e2d99b698542105e10777a5105a60bb04f4d80bfbf95f20f3365cb77e5d47"
+  }
+]
