@@ -39,7 +39,8 @@ struct SessionSummaryView: View {
                 Button(actionTitle, action: performAction)
                     .buttonStyle(PrimaryConnectionButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(connection.state == .disconnecting && !model.switcher.isSwitching)
+                    .disabled((connection.state == .disconnecting && !model.switcher.isSwitching) ||
+                              (!model.hasSelectedProfile && !model.canManageProfiles))
             }
             if let error {
                 HStack(alignment: .top, spacing: 16) {
@@ -84,7 +85,9 @@ struct SessionSummaryView: View {
            let target = model.profiles.first(where: { $0.id == id }) {
             return "Восстанавливаем сеть перед подключением «\(target.name)»"
         }
-        if connection.state == .idle { return model.draft.name }
+        if connection.state == .idle {
+            return model.hasSelectedProfile ? model.draft.name : "Добавьте первое подключение"
+        }
         return profile?.name ?? "Выберите подключение ниже"
     }
 
@@ -93,13 +96,18 @@ struct SessionSummaryView: View {
         switch connection.state {
         case .connected: return "Отключить"
         case .disconnecting: return "Отключаем…"
-        default: return connection.locked ? "Отменить" : "Подключить"
+        default:
+            if connection.locked { return "Отменить" }
+            return model.hasSelectedProfile ? "Подключить" : "Добавить подключение"
         }
     }
 
     private func performAction() {
         if connection.locked || model.switcher.isSwitching {
             model.disconnect()
+        } else if !model.hasSelectedProfile {
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "add-connection")
         } else {
             model.connectProfile(connection.state == .failed ? (profile?.id ?? model.draft.id) : model.draft.id)
         }

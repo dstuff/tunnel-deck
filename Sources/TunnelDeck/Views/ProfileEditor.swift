@@ -6,6 +6,18 @@ struct ProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     private var state: ConnectionState { model.connection.state(for: model.draft.id) }
     var body: some View {
+        Group {
+            if model.hasSelectedProfile {
+                editor
+            } else {
+                ContentUnavailableView("Нет выбранного подключения", systemImage: "network",
+                                       description: Text("Добавьте подключение в главном окне TunnelDeck."))
+            }
+        }
+        .frame(minWidth: 600, minHeight: 580)
+    }
+
+    private var editor: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 16) {
                 Image(systemName: model.draft.kind.symbol)
@@ -96,6 +108,5 @@ struct ProfileEditor: View {
             }
             .padding(.horizontal, 26).padding(.bottom, 20)
         }
-        .frame(minWidth: 600, minHeight: 580)
     }
 }

@@ -29,13 +29,19 @@ struct ContentView: View {
                     Text("Подключения")
                         .font(.callout.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.horizontal, 10).padding(.top, 24)
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.profiles) { profile in
-                            ProfileRowView(profile: profile, model: model,
-                                           edit: { edit(profile) },
-                                           delete: { profileToDelete = profile })
-                            if profile.id != model.profiles.last?.id {
-                                Divider().padding(.leading, 78).padding(.trailing, 12)
+                    if model.profiles.isEmpty {
+                        ContentUnavailableView("Нет подключений", systemImage: "network",
+                                               description: Text("Добавьте подключение, чтобы настроить VPN."))
+                            .frame(maxWidth: .infinity).padding(.vertical, 24)
+                    } else {
+                        LazyVStack(spacing: 0) {
+                            ForEach(model.profiles) { profile in
+                                ProfileRowView(profile: profile, model: model,
+                                               edit: { edit(profile) },
+                                               delete: { profileToDelete = profile })
+                                if profile.id != model.profiles.last?.id {
+                                    Divider().padding(.leading, 78).padding(.trailing, 12)
+                                }
                             }
                         }
                     }

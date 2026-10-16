@@ -39,13 +39,14 @@ import TunnelCore
         self.connection = connection
         switcher = ProfileSwitcher(connection: connection)
         self.profileStore = profileStore
-        let document: ProfileStore.Document
-        do { document = try profileStore.load() }
+        let loadedDocument: ProfileStore.Document?
+        do { loadedDocument = try profileStore.load() }
         catch {
-            document = .init()
+            loadedDocument = nil
             loadError = error.localizedDescription
             persistenceError = error.localizedDescription
         }
+        let document = loadedDocument ?? .init()
         profiles = document.profiles
         routing = document.routing
         savedRouting = document.routing
@@ -67,9 +68,11 @@ import TunnelCore
             }
             try? FileManager.default.removeItem(at: url)
         }
-        if profiles.isEmpty { profiles = [VPNProfile(name: "Мой ocserv")] }
+        if loadError == nil, loadedDocument == nil, profiles.isEmpty {
+            profiles = [VPNProfile(name: "Мой ocserv")]
+        }
         let selected = document.selectedProfile.flatMap { id in profiles.first(where: { $0.id == id })?.id }
-        select(selected ?? profiles[0].id)
+        select(selected ?? profiles.first?.id)
         isLoading = false
     }
     func select(_ id: UUID?) {
@@ -107,7 +110,7 @@ import TunnelCore
         }
     }
     private func persist(_ updatedProfiles: [VPNProfile], secrets updatedSecrets: [UUID: ProfileSecrets],
-                         selected: UUID) -> Bool {
+                         selected: UUID?) -> Bool {
         guard loadError == nil else { persistenceError = loadError; return false }
         var storedSecrets: [String: ProfileSecrets] = [:]
         var retainedSecrets: [UUID: ProfileSecrets] = [:]
@@ -129,13 +132,24 @@ import TunnelCore
             return false
         }
     }
-    private func activate(_ id: UUID) {
+    private func activate(_ id: UUID?) {
         isLoading = true
-        select(id)
+        if let id {
+            select(id)
+        } else {
+            selection = nil
+            draft = VPNProfile()
+            secrets = ProfileSecrets()
+            connection.resetProfileResult()
+            notice = nil
+        }
         isLoading = false
     }
     @discardableResult func save(showNotice: Bool = true) -> Bool {
         autosave?.cancel(); autosave = nil
+        guard hasSelectedProfile else {
+            return persist(profiles, secrets: inMemorySecrets, selected: nil)
+        }
         // Normalize the stored copy so editing the URL does not move the cursor.
         var profile = draft
         var savedSecrets = secrets
@@ -158,18 +172,18 @@ import TunnelCore
         return true
     }
     func deleteSelected() {
-        guard canManageProfiles, connection.activeProfile != draft.id else { return }
+        guard canManageProfiles, hasSelectedProfile, connection.activeProfile != draft.id else { return }
         let id = draft.id
         autosave?.cancel(); autosave = nil
-        var updatedProfiles = profiles.filter { $0.id != id }
+        let updatedProfiles = profiles.filter { $0.id != id }
         var updatedSecrets = inMemorySecrets
         updatedSecrets.removeValue(forKey: id)
-        if updatedProfiles.isEmpty { updatedProfiles = [VPNProfile(name: "Мой ocserv")] }
-        let selected = updatedProfiles[0].id
+        let selected = updatedProfiles.first?.id
         guard persist(updatedProfiles, secrets: updatedSecrets, selected: selected) else { return }
         activate(selected)
     }
     func importConfiguration() {
+        guard hasSelectedProfile else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.title = draft.kind == .amneziaWG ? "Выберите конфигурацию AmneziaWG" : "Выберите конфигурацию Xray"
@@ -182,6 +196,9 @@ import TunnelCore
         } catch { notice = error.localizedDescription }
     }
     var canManageProfiles: Bool { loadError == nil && !connection.state.busy && !switcher.isSwitching }
+    var hasSelectedProfile: Bool {
+        profiles.contains(where: { $0.id == draft.id })
+    }
     var canConnectProfile: Bool {
         !switcher.isSwitching && (!connection.locked || connection.state == .connected)
     }
@@ -210,7 +227,7 @@ import TunnelCore
     }
 
     func connect() {
-        guard !switcher.isSwitching else { return }
+        guard hasSelectedProfile, !switcher.isSwitching else { return }
         if save(showNotice: false) { connection.connect(profile: draft, secrets: secrets, routing: routing) }
     }
 
@@ -237,7 +254,7 @@ import TunnelCore
     }
 
     func check() {
-        guard !switcher.isSwitching, save(showNotice: false) else { return }
+        guard hasSelectedProfile, !switcher.isSwitching, save(showNotice: false) else { return }
         connection.check(profile: draft, secrets: secrets)
     }
 

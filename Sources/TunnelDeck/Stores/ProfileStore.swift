@@ -3,7 +3,8 @@ import Darwin
 import TunnelCore
 
 protocol ProfileStorage {
-    func load() throws -> ProfileStore.Document
+    /// nil means first launch; a saved document may intentionally contain no profiles.
+    func load() throws -> ProfileStore.Document?
     func save(_ document: ProfileStore.Document) throws
 }
 
@@ -49,10 +50,10 @@ struct ProfileStore: ProfileStorage {
         self.file = file
     }
 
-    func load() throws -> Document {
+    func load() throws -> Document? {
         let data: Data
         do { data = try Data(contentsOf: file) }
-        catch CocoaError.fileReadNoSuchFile { return Document() }
+        catch CocoaError.fileReadNoSuchFile { return nil }
         catch { throw VPNError("Не удалось прочитать локальный файл профилей. Проверьте доступ к файлу и перезапустите TunnelDeck.") }
         do {
             let decoder = JSONDecoder()

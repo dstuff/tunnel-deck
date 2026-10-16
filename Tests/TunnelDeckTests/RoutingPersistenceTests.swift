@@ -15,7 +15,7 @@ import TunnelCore
         try await Task.sleep(for: .milliseconds(600))
         let restarted = AppModel(profileStore: storage, arguments: [])
         XCTAssertEqual(restarted.routing, model.routing)
-        XCTAssertEqual(try storage.load().version, 3)
+        XCTAssertEqual(try storage.load()?.version, 3)
         var document = try JSONSerialization.jsonObject(with: Data(contentsOf: storage.file)) as! [String: Any]
         document["version"] = 2; document.removeValue(forKey: "routing")
         try JSONSerialization.data(withJSONObject: document).write(to: storage.file)
@@ -61,7 +61,7 @@ import TunnelCore
         let wrapped: ProfileStore
         var reject = false
         init(_ wrapped: ProfileStore) { self.wrapped = wrapped }
-        func load() throws -> ProfileStore.Document { try wrapped.load() }
+        func load() throws -> ProfileStore.Document? { try wrapped.load() }
         func save(_ document: ProfileStore.Document) throws {
             if reject { throw VPNError("Synthetic write failure") }; try wrapped.save(document)
         }

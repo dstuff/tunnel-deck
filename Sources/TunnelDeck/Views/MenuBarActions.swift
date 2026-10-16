@@ -21,7 +21,7 @@ struct MenuBarActions: View {
                 Button(shortName(profile.name)) { model.connectProfile(profile.id) }
                     .disabled(!model.canConnectProfile || model.connection.activeProfile == profile.id)
             }
-        }
+        }.disabled(model.profiles.isEmpty)
         Button("Открыть TunnelDeck") {
             NSApp.activate(ignoringOtherApps: true)
             if let main = NSApp.windows.first(where: { $0.title == "TunnelDeck" && $0.canBecomeMain }) {
@@ -56,7 +56,7 @@ struct ConnectionCommands: Commands {
             Button("Добавить подключение…") { openWindow(id: "add-connection") }
                 .keyboardShortcut("n").disabled(!model.canManageProfiles)
             Button("Настройки подключения…") { openWindow(id: "profile-editor") }
-                .keyboardShortcut("i").disabled(!model.canManageProfiles)
+                .keyboardShortcut("i").disabled(!model.canManageProfiles || !model.hasSelectedProfile)
         }
         CommandGroup(after: .toolbar) {
             Button("Маршрутизация…") { openWindow(id: "routing") }

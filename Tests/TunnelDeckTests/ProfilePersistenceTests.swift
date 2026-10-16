@@ -125,8 +125,8 @@ import TunnelCore
         XCTAssertEqual(model.draft, profile)
         XCTAssertTrue(model.secrets.password.isEmpty)
         XCTAssertTrue(model.save())
-        XCTAssertEqual((try store.load()).profiles, [profile])
-        XCTAssertEqual((try store.load()).selectedProfile, profile.id)
+        XCTAssertEqual(try store.load()?.profiles, [profile])
+        XCTAssertEqual(try store.load()?.selectedProfile, profile.id)
     }
 
     func testSaveFailureKeepsCurrentEditsAndPreventsProfileSwitch() async throws {
@@ -163,9 +163,120 @@ import TunnelCore
         model.draft.name = "Pending edit"
         model.deleteSelected()
         try await Task.sleep(for: .milliseconds(650))
-        XCTAssertNil((try store.load()).secrets[deletedID.uuidString])
-        XCTAssertFalse((try store.load()).profiles.contains(where: { $0.id == deletedID }))
-        XCTAssertEqual((try store.load()).selectedProfile, model.draft.id)
+        let document = try XCTUnwrap(store.load())
+        XCTAssertTrue(document.secrets.isEmpty)
+        XCTAssertFalse(document.profiles.contains(where: { $0.id == deletedID }))
+        XCTAssertTrue(model.profiles.isEmpty)
+        XCTAssertNil(model.selection)
+        XCTAssertTrue(model.secrets.password.isEmpty)
+        XCTAssertTrue(document.profiles.isEmpty)
+        XCTAssertNil(document.selectedProfile)
+
+        // Autosave and the save performed on exit must not recreate a deleted profile.
+        XCTAssertTrue(model.save(showNotice: false))
+        let restarted = AppModel(profileStore: store, arguments: [])
+        XCTAssertTrue(restarted.profiles.isEmpty)
+        XCTAssertNil(restarted.selection)
+        XCTAssertFalse(restarted.hasSelectedProfile)
+    }
+
+    func testFirstLaunchCreatesDefaultButSavedEmptyDocumentsStayEmpty() throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.file.deletingLastPathComponent()) }
+        XCTAssertNil(try store.load())
+        let firstLaunch = AppModel(profileStore: store, arguments: [])
+        XCTAssertEqual(firstLaunch.profiles.map(\.name), ["Мой ocserv"])
+        XCTAssertTrue(firstLaunch.hasSelectedProfile)
+
+        // Both the current format and the legacy empty array represent an intentional empty list.
+        try store.save(.init())
+        for data in [try Data(contentsOf: store.file), Data("[]".utf8)] {
+            try data.write(to: store.file)
+            let model = AppModel(profileStore: store, arguments: [])
+            XCTAssertTrue(model.profiles.isEmpty)
+            XCTAssertNil(model.selection)
+            XCTAssertFalse(model.hasSelectedProfile)
+            XCTAssertTrue(model.save(showNotice: false))
+            XCTAssertTrue(try XCTUnwrap(store.load()).profiles.isEmpty)
+        }
+    }
+
+    func testEmptyListSavesRoutingAndAllowsAddingAndImportingWithoutOldSecrets() async throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.file.deletingLastPathComponent()) }
+        let model = AppModel(profileStore: store, arguments: [])
+        model.secrets.password = "synthetic-deleted-password"
+        model.deleteSelected()
+        let placeholderID = model.draft.id
+        model.connect()
+        model.check()
+        model.connectProfile(placeholderID)
+        model.deleteSelected()
+        XCTAssertEqual(model.connection.state, .idle)
+        XCTAssertNil(model.connection.statusProfile)
+        XCTAssertFalse(model.connection.hasSession)
+
+        // A stale editor must not save its fields into the empty list.
+        model.draft.name = "Stale editor"
+        model.secrets.password = "synthetic-stale-password"
+        model.routing.name = "Правила без подключений"
+        try await Task.sleep(for: .milliseconds(650))
+        let emptyDocument = try XCTUnwrap(store.load())
+        XCTAssertTrue(emptyDocument.profiles.isEmpty)
+        XCTAssertTrue(emptyDocument.secrets.isEmpty)
+        XCTAssertNil(emptyDocument.selectedProfile)
+        XCTAssertEqual(emptyDocument.routing.name, "Правила без подключений")
+
+        model.add(.amneziaWG)
+        XCTAssertEqual(model.profiles.count, 1)
+        XCTAssertEqual(model.draft.kind, .amneziaWG)
+        XCTAssertTrue(model.hasSelectedProfile)
+        XCTAssertTrue(model.secrets.password.isEmpty)
+        XCTAssertEqual(AppModel(profileStore: store, arguments: []).selection, model.selection)
+
+        model.deleteSelected()
+        let imported = try ConnectionImport("https://vpn.example/")
+        XCTAssertTrue(model.importConnection(imported, name: "Imported", username: "test-user", password: "synthetic-imported-password"))
+        XCTAssertEqual(model.profiles.count, 1)
+        let restarted = AppModel(profileStore: store, arguments: [])
+        XCTAssertEqual(restarted.selection, model.selection)
+        XCTAssertEqual(restarted.draft.name, "Imported")
+        XCTAssertEqual(restarted.secrets.password, "synthetic-imported-password")
+        XCTAssertEqual(restarted.routing.name, "Правила без подключений")
+    }
+
+    func testFailedLastProfileDeletionKeepsSelectionAndSecrets() throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.file.deletingLastPathComponent()) }
+        let failing = FailingProfileStore(store: store)
+        let model = AppModel(profileStore: failing, arguments: [])
+        model.secrets.password = "synthetic-password"
+        XCTAssertTrue(model.save(showNotice: false))
+        let originalProfile = model.draft
+        let original = try Data(contentsOf: store.file)
+        failing.rejectWrites = true
+        model.deleteSelected()
+        XCTAssertEqual(model.profiles, [originalProfile])
+        XCTAssertEqual(model.selection, originalProfile.id)
+        XCTAssertTrue(model.hasSelectedProfile)
+        XCTAssertEqual(model.secrets.password, "synthetic-password")
+        XCTAssertNotNil(model.persistenceError)
+        XCTAssertEqual(try Data(contentsOf: store.file), original)
+    }
+
+    func testDeletingSelectedProfileKeepsAndSelectsRemainingProfile() throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.file.deletingLastPathComponent()) }
+        let model = AppModel(profileStore: store, arguments: [])
+        let remainingID = model.draft.id
+        model.secrets.password = "synthetic-retained-password"
+        model.add(.xray)
+        model.deleteSelected()
+        XCTAssertEqual(model.profiles.map(\.id), [remainingID])
+        XCTAssertEqual(model.selection, remainingID)
+        XCTAssertTrue(model.hasSelectedProfile)
+        XCTAssertEqual(model.secrets.password, "synthetic-retained-password")
+        XCTAssertEqual(AppModel(profileStore: store, arguments: []).selection, remainingID)
     }
 
     func testQuickImportPersistsAllDataWithoutConnecting() async throws {
@@ -182,9 +293,9 @@ import TunnelCore
         XCTAssertEqual(model.secrets.configuration, link)
         XCTAssertTrue(model.draft.username.isEmpty)
         XCTAssertTrue(model.secrets.password.isEmpty)
-        XCTAssertEqual((try store.load()).secrets[importedID.uuidString]?.configuration, link)
+        XCTAssertEqual(try store.load()?.secrets[importedID.uuidString]?.configuration, link)
         XCTAssertEqual(model.connection.state, .idle, "Import must not start a connection")
-        XCTAssertEqual((try store.load()).profiles.first?.name, "Existing edits")
+        XCTAssertEqual(try store.load()?.profiles.first?.name, "Existing edits")
         let metadata = try String(contentsOf: store.file, encoding: .utf8)
         XCTAssertTrue(metadata.contains("synthetic-password"))
         XCTAssertTrue(metadata.contains("trojan://"))
@@ -229,7 +340,7 @@ import TunnelCore
         XCTAssertTrue(model.secrets.configuration.isEmpty)
         model.secrets.configuration = "vless://synthetic-id@vpn.example:443"
         XCTAssertTrue(model.save())
-        let document = try store.load()
+        let document = try XCTUnwrap(store.load())
         XCTAssertEqual(document.version, 3)
         XCTAssertEqual(document.profiles, [first, second])
         let restarted = AppModel(profileStore: store, arguments: [])
@@ -242,7 +353,7 @@ import TunnelCore
         let store = temporaryStore()
         let directory = store.file.deletingLastPathComponent()
         defer { try? FileManager.default.removeItem(at: directory) }
-        XCTAssertTrue(try store.load().profiles.isEmpty, "A missing file is a valid first launch")
+        XCTAssertNil(try store.load(), "A missing file is a valid first launch")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for contents in ["{invalid-json-with-synthetic-secret", "", "{\"version\":99,\"profiles\":[],\"secrets\":{}}",
                          "{\"version\":2,\"profiles\":[]}"] {
@@ -322,7 +433,7 @@ private final class FailingProfileStore: ProfileStorage {
     var maximumProfiles = Int.max
     var rejectedSelection: UUID?
     init(store: ProfileStore) { self.store = store }
-    func load() throws -> ProfileStore.Document { try store.load() }
+    func load() throws -> ProfileStore.Document? { try store.load() }
     func save(_ document: ProfileStore.Document) throws {
         if rejectWrites || document.profiles.count > maximumProfiles ||
             (rejectedSelection != nil && document.selectedProfile == rejectedSelection) {
