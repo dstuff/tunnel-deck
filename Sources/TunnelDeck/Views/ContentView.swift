@@ -14,7 +14,7 @@ struct ContentView: View {
             Divider()
             Button { present("routing") } label: {
                 HStack(spacing: 9) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.triangle.branch").foregroundStyle(.secondary)
                     Text("Маршрутизация")
                     Text(model.routing.name).foregroundStyle(.secondary).lineLimit(1)
                     Spacer(minLength: 12)
