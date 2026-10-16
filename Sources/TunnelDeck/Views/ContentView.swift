@@ -30,6 +30,18 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 18).padding(.bottom, 22)
             }
+            HStack {
+                Button { present("add-connection") } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Добавить подключение")
+                    }.fixedSize()
+                }
+                .buttonStyle(PrimaryConnectionButtonStyle())
+                .disabled(!model.canManageProfiles)
+                Spacer()
+            }
+            .padding(.horizontal, 28).padding(.vertical, 16)
             Divider()
             HStack {
                 Button("Диагностика", systemImage: "waveform.path.ecg") { present("diagnostics") }
@@ -45,18 +57,6 @@ struct ContentView: View {
         .frame(minWidth: 720, minHeight: 480)
         .tint(.blue)
         .navigationTitle("TunnelDeck")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { present("add-connection") } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                        Text("Добавить подключение")
-                    }.fixedSize()
-                }
-                    .buttonStyle(PrimaryConnectionButtonStyle())
-                    .disabled(!model.canManageProfiles)
-            }
-        }
         .alert("Удалить подключение?", isPresented: Binding(
             get: { profileToDelete != nil },
             set: { if !$0 { profileToDelete = nil } }
