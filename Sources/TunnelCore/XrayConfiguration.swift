@@ -42,17 +42,17 @@ public struct XrayConfiguration {
         endpointHosts.map { resolvedHosts[$0] ?? $0 }
     }
 
-    public var usesShadowrocketVisionTLS: Bool {
-        (configuration["outbounds"] as? [[String: Any]] ?? []).contains(where: Self.isShadowrocketVision)
+    public var usesVisionCompatibilityTLS: Bool {
+        (configuration["outbounds"] as? [[String: Any]] ?? []).contains(where: Self.isVisionCompatibility)
     }
 
-    private static func isShadowrocketVision(_ outbound: [String: Any]) -> Bool {
+    private static func isVisionCompatibility(_ outbound: [String: Any]) -> Bool {
         guard outbound["protocol"] as? String == "vless",
               let stream = outbound["streamSettings"] as? [String: Any],
               stream["security"] as? String == "reality" else { return false }
         let reality = stream["realitySettings"] as? [String: Any] ?? [:]
         let preset = reality["fingerprint"] as? String ?? ""
-        guard ["", "chrome", "safari", "safari15_5", "shadowrocket_safari15_5"].contains(preset) else { return false }
+        guard ["", "chrome", "safari", "safari15_5", "tunneldeck_safari15_5"].contains(preset) else { return false }
         let settings = outbound["settings"] as? [String: Any] ?? [:]
         return (settings["vnext"] as? [[String: Any]] ?? []).contains { server in
             (server["users"] as? [[String: Any]] ?? []).contains {
@@ -73,13 +73,13 @@ public struct XrayConfiguration {
         var result: [String: Any] = ["log": ["loglevel": "warning"]]
         for key in ["outbounds", "routing", "dns", "policy"] { result[key] = configuration[key] }
         result["outbounds"] = (configuration["outbounds"] as? [[String: Any]] ?? []).map { original in
-            guard Self.isShadowrocketVision(original) else { return original }
+            guard Self.isVisionCompatibility(original) else { return original }
             var outbound = original
             var stream = outbound["streamSettings"] as? [String: Any] ?? [:]
             var reality = stream["realitySettings"] as? [String: Any] ?? [:]
             // The pinned core patch recreates the observed Safari15_5 settings:
             // ordinary X25519, no ALPN, and a single RSA-PSS/SHA384 entry.
-            reality["fingerprint"] = "shadowrocket_safari15_5"
+            reality["fingerprint"] = "tunneldeck_safari15_5"
             stream["realitySettings"] = reality; outbound["streamSettings"] = stream
             return outbound
         }

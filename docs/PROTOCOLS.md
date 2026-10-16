@@ -17,9 +17,9 @@ TunnelDeck — SwiftPM-приложение для macOS 14+ с двумя ис�
 
 | Протокол в приложении | Движок | Путь трафика | Условие состояния «Подключено» |
 | --- | --- | --- | --- |
-| OpenConnect / ocserv | Homebrew OpenConnect, на проверенной машине 9.21 | Системный интерфейс → OpenConnect → CSTP/DTLS → ocserv | Получен cookie авторизации и успешно выполнен сетевой скрипт |
+| OpenConnect / ocserv | Встроенный OpenConnect 9.21 + статический OpenSSL 3.6.2 | Системный интерфейс → OpenConnect → CSTP/DTLS → ocserv | Получен cookie авторизации и успешно выполнен сетевой скрипт |
 | AmneziaWG 3.1 | `amneziawg-go` 3.1.20260828, `awg-tools` 3.1.20260812 | `utun` → AmneziaWG → UDP → сервер | Установлена сеть и получен ненулевой timestamp handshake хотя бы одного Peer |
-| Xray | Xray 26.3.27+tunneldeck.1, HevSocks5Tunnel 2.19.0 | `utun` → Hev/lwIP → локальный SOCKS5 → Xray → сервер | После установки сети получен успешный HTTPS-ответ через системный туннель |
+| Xray | Xray 26.3.27+tunneldeck.2, HevSocks5Tunnel 2.19.0 | `utun` → Hev/lwIP → локальный SOCKS5 → Xray → сервер | После установки сети получен успешный HTTPS-ответ через системный туннель |
 
 Реальные версии, источники и SHA-256 находятся в
 [Runtime/versions.json](../Runtime/versions.json). Версия в исторической строке
@@ -47,6 +47,8 @@ TunnelDeck — SwiftPM-приложение для macOS 14+ с двумя ис�
 [SecureSession.swift](../Sources/TunnelDeckHelper/SecureSession.swift):
 
 - каталог сеанса имеет права `0700`, файлы и управляющий FIFO — `0600`;
+- UI и helper удерживают разделяемую блокировку файла `lease` до завершения
+  работы с каталогом; очистка получает исключительную неблокирующую блокировку;
 - helper проверяет владельца, права, тип файлов, отсутствие символических ссылок
   и лишних жёстких ссылок; размер запроса ограничен 512 000 байт;
 - запрос содержит UID пользователя и PID UI; после чтения `request.json` удаляется;
@@ -61,6 +63,24 @@ TunnelDeck — SwiftPM-приложение для macOS 14+ с двумя ис�
 После мягкой остановки предусмотрена эскалация до принудительного завершения
 дочернего движка. Это управление дочерними процессами не означает гарантированную
 очистку сети при `SIGKILL` самого helper или аварии ОС.
+
+Журнал сеанса ограничен **5 000 000 байтами**, включая служебные записи.
+[SessionEventLog.swift](../Sources/TunnelCore/SessionEventLog.swift) при достижении
+лимита очищает старые диагностические сообщения и продолжает запись в тот же
+проверенный файл. В нём сохраняется последнее событие каждого служебного типа,
+в том числе готовность сети, ошибка и завершение. Большие отдельные сообщения
+сокращаются; JSON-экранирование также учитывается в размере записи. Секреты
+скрываются до сокращения и записи сообщения.
+
+Чтение и запись согласованы файловой блокировкой. Заголовок поколения и
+порядковые номера позволяют UI продолжить чтение после очистки файла без
+повторной обработки уже полученных событий. В окне остаются последние
+1200 записей; кнопка очистки очищает только этот список в памяти.
+
+При запуске UI удаляет оставшиеся каталоги сеансов текущего пользователя,
+если ни UI, ни helper больше не удерживают их `lease`. Проверяются имя UUID,
+права и владелец; символические ссылки и каталоги прежних версий без `lease`
+не удаляются. При штатном завершении каталог удаляется сразу, как и раньше.
 
 Главное окно показывает компактный список профилей. «Переключиться» управляется
 [ProfileSwitcher.swift](../Sources/TunnelDeck/Services/ProfileSwitcher.swift):
@@ -172,7 +192,7 @@ Camouflage не превращается в `authgroup`. Для старых п�
 
 ### 2.3. Маршруты, DNS и завершение
 
-Маршруты, адреса и DNS из параметров сервера устанавливает системный `vpnc-script`.
+Маршруты, адреса и DNS из параметров сервера устанавливает поставляемый `vpnc-script`.
 Приложение создаёт свою обёртку, которая сначала вызывает этот скрипт и проверяет
 его код возврата. При успешном `connect`/`reconnect` обёртка создаёт маркер
 `network-ready`, при `disconnect` удаляет его.
@@ -188,9 +208,44 @@ Helper следит за маркером и состоянием процесс
 его обработкой `vpnc-script`. Общий `NetworkConfiguration` для этого backend
 не используется.
 
-OpenConnect и `vpnc-script` ищутся в `/opt/homebrew` или `/usr/local`. Их библиотеки
-не включены в app bundle, поэтому для чистой машины требуется установленная
-зависимость. Текущая поставка — локальная ad-hoc сборка.
+OpenConnect запускается только из `Runtime/bin/openconnect`, сетевой скрипт —
+из `Runtime/openconnect/vpnc-script` внутри app bundle. Обёртка helper явно
+передаётся через `--script`; встроенный путь по умолчанию у движка —
+`/usr/bin/false`, поэтому случайный запуск без обёртки не использует чужой скрипт.
+Отсутствующий или неисполняемый компонент считается неполной сборкой: fallback
+на Homebrew нет. PATH helper содержит встроенный `bin` и системные каталоги macOS.
+
+### 2.4. Автономная сборка и перенос
+
+[script/build_openconnect.sh](../script/build_openconnect.sh) собирает отдельный
+клиент из неизменённых исходников OpenConnect 9.21 со статическими библиотеками
+OpenSSL 3.6.2. Для сборки pkgconf 3.0.8 также собирается из закреплённого архива
+в приватном рабочем каталоге проекта; установка build tools через Homebrew
+не требуется. Все архивы и vpnc-script фиксированы SHA-256, источник скрипта —
+commit `ce9e961bd0f6b867e1c7c35f78f6fb973f6ff101`. Версии, ссылки на исходники,
+SHA-256 движка и build script записываются в `Runtime/versions.json`.
+
+Целевая архитектура — arm64, минимальная версия — macOS 14.0. OpenSSL включён
+статически, внешние providers/DSO отключены. Из динамических зависимостей
+разрешены только Apple `/usr/lib` и `/System/Library`. Проверка
+[script/verify_openconnect.py](../script/verify_openconnect.py) отклоняет
+сторонние dylib, другую архитектуру, повышение deployment target или неожиданную
+версию OpenConnect/OpenSSL; она выполняется перед упаковкой. В bundle входят
+лицензии, уведомление о составе и скрипты пересборки.
+
+TLS/DTLS теперь использует OpenSSL вместо GnuTLS установленного ранее
+Homebrew-клиента. Проверка сертификата включена; OpenSSL собран с
+`--openssldir=/etc/ssl` и использует системный `/etc/ssl/cert.pem`. Это не
+автоматический импорт пользовательских сертификатов из Связки ключей.
+Явный `servercert` по-прежнему передаётся движку. PKCS#11, SecurID, аппаратный
+Yubikey, GSSAPI и LZ4 в этой сборке не включены; приложение использует
+логин/пароль, cookie, CSTP и при доступности DTLS.
+
+ocserv остаётся на удалённом сервере: в приложение включён клиент OpenConnect,
+серверный демон не требуется. На другом Mac не нужны Homebrew и отдельная
+установка OpenConnect. Сборка остаётся локальной ad-hoc и не заверена Apple.
+Deployment target и отсутствие сторонних dylib не заменяют запуск на macOS 14
+или отдельном чистом Mac; эти варианты требуют самостоятельной проверки.
 
 ## 3. AmneziaWG 3.1
 
@@ -351,41 +406,36 @@ loopback-адрес UDP relay; listener имеет tag `tunneldeck`, UDP вкл�
 `sockopt.interface`, чтобы прямое исходящее соединение обходило захват.
 Автоматического `sendThrough` на физический IPv4 нет.
 
-### 4.4. REALITY / XTLS Vision и совместимость с Shadowrocket
+### 4.4. REALITY / XTLS Vision и TLS-профиль совместимости
 
-Исследование Shadowrocket показало разделение `NEPacketTunnelProvider → lwIP →
-native proxy socket`. В исследованном Vision-пути TLS-контекст выбирается
-через общий cache/context, а не прямым использованием серверного имени
-fingerprint. При незаданной глобальной настройке таблица профилей выбирает
-Safari 15.5. Поэтому строка `chrome` в импортированном JSON не гарантировала
-одинаковый ClientHello в Shadowrocket и стандартном Xray/uTLS.
-
-В поставляемом Xray добавлен отдельный профиль `shadowrocket_safari15_5`.
+В поставляемом Xray добавлен отдельный профиль `tunneldeck_safari15_5`.
 Он строится на публичном uTLS Safari 16 preset со следующими изменениями:
 
 - из списка расширений удаляется ALPN;
 - из списка алгоритмов подписи удаляется повторный `RSA-PSS/SHA384`;
 - сохраняются обычный X25519 key share и остальные параметры базового preset.
 
-Это воспроизводит выявленные параметры профиля. Побайтовое совпадение с
-сериализацией BoringSSL и полная копия нативной реализации Shadowrocket
-не заявляются.
+Это воспроизводит параметры совместимого профиля Safari 15.5. Побайтовое
+совпадение с сериализацией BoringSSL и нативное поведение TCP не заявляются.
 
 Автоматический выбор профиля в генераторе применяется только при всех условиях:
 
 1. Outbound — `vless`, защита — `reality`.
 2. Хотя бы один user в `vnext` имеет `flow`, начинающийся с `xtls-rprx-vision`.
 3. Исходный fingerprint отсутствует/пустой либо равен `chrome`, `safari`,
-   `safari15_5`, `shadowrocket_safari15_5`.
+   `safari15_5`, `tunneldeck_safari15_5`.
 
-Тогда в runtime JSON fingerprint становится `shadowrocket_safari15_5`.
+Тогда в runtime JSON fingerprint становится `tunneldeck_safari15_5`.
 Другие явно заданные профили, например `hellochrome_131` и `firefox`, остаются
 как указаны пользователем. Исходный сохранённый JSON не переписывается;
 ключи, SNI, short ID и flow этим преобразованием не изменяются.
 
 Patch изменяет выбор и построение ClientHello, сохраняя механизм REALITY
 authentication, проверку сертификата и числовую версию клиента `26.3.27`.
-Сборка явно обозначена `TunnelDeck.1` и не выдаётся за неизменённый upstream.
+Сборка явно обозначена `TunnelDeck.2` и не выдаётся за неизменённый upstream.
+Имя профиля согласовано в генераторе, core patch, тестах и поставляемом движке.
+В журнале проверки и helper используется строка
+«REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.».
 Фрагментация TLS, ограничение числа handshake и подмена на стандартный Safari
 не включены автоматически: проведённые эксперименты не подтвердили их как
 устойчивое исправление.
@@ -394,8 +444,7 @@ authentication, проверку сертификата и числовую ве
 
 - [script/xray_compat.patch](../script/xray_compat.patch);
 - [script/build_xray_compat.sh](../script/build_xray_compat.sh);
-- [уведомление о модификациях и лицензии](../Runtime/licenses/Xray-compat-notice.txt);
-- [журнал исследования и проверок](../../analysis/shadowrocket-xray-compatibility.txt).
+- [уведомление о модификациях и лицензии](../Runtime/licenses/Xray-compat-notice.txt).
 
 ### 4.5. Проверка и завершение
 
@@ -464,7 +513,7 @@ python3 Tests/Integration/engine_smoke.py
 ```
 
 Подготовка скачивает закреплённые исходники/артефакты, проверяет SHA-256,
-собирает AWG и изменённый Xray. Для Xray используется Go 1.26.0; необходимые
+собирает AWG, изменённый Xray и автономный OpenConnect/OpenSSL. Для Xray используется Go 1.26.0; необходимые
 toolchain и зависимости загружаются автоматически. Самостоятельная пересборка
 только Xray:
 
@@ -473,6 +522,18 @@ bash script/build_xray_compat.sh
 python3 script/runtime_manifest.py Runtime --verify-pins
 python3 script/runtime_manifest.py Runtime
 ```
+
+Самостоятельная пересборка OpenConnect и проверка уже упакованного runtime:
+
+```sh
+bash script/build_openconnect.sh
+python3 script/verify_openconnect.py Runtime/bin/openconnect
+python3 script/runtime_manifest.py Runtime
+python3 Tests/Integration/engine_smoke.py --runtime-root dist/TunnelDeck.app/Contents/Resources/Runtime
+```
+
+После осознанного изменения исходников, build options или toolchain необходимо
+обновить закреплённый SHA движка в `script/runtime_manifest.py` и manifest вместе.
 
 `build_xray_compat.sh` распаковывает закреплённый источник в новый временный
 каталог, применяет repo patch, выполняет два офлайн-теста ClientHello и собирает
@@ -484,9 +545,9 @@ manifest с хешами уже подписанных файлов. Patch, buil
 
 | Проверка | Что подтверждено |
 | --- | --- |
-| Swift suite | 39 тестов: конфигурации, URL/camouflage, AWG 3.1, Xray listener/routing/TLS mapping, Hev config, секреты, локальное сохранение/импорт профилей, миграция, права файлов, ошибки записи/чтения/формата, состояния, ожидание/отмена/ошибка/таймаут переключения |
+| Swift suite | 48 тестов: конфигурации, URL/camouflage, AWG 3.1, Xray listener/routing/TLS mapping, Hev config, поставляемый OpenConnect, секреты, локальное сохранение/импорт профилей, миграция, права файлов, ошибки записи/чтения/формата, состояния, переключение, лимит журнала, чтение после ротации и очистка оставшихся сеансов |
 | Офлайн-тесты core patch | ClientHello без ALPN, один PSS/SHA384, обычный X25519; стандартный Safari preset не меняется |
-| OpenConnect integration smoke | Точный начальный camouflage POST через локальный TLS с pin; без реального входа и туннеля |
+| OpenConnect integration smoke | Перенесённый бинарник с чистым PATH; отказ недоверенному сертификату/неверному pin; приём локального CA и верного pin; точный camouflage POST. Без реального входа и туннеля |
 | AWG integration smoke | Официальный парсер принимает проверяемые поля 3.1, диапазоны и I1/I3; это не удалённый handshake |
 | Xray integration smoke | Реальный поставляемый core принимает синтетическую VLESS/REALITY-конфигурацию |
 | Live REALITY/Vision, 15.10.2026 | Совместимый ClientHello прошёл две SOCKS-серии 8/8; полный системный VPN прошёл UDP DNS и 8/8 параллельных HTTPS-запросов; UI показал «Подключено» |
@@ -495,6 +556,36 @@ manifest с хешами уже подписанных файлов. Patch, buil
 Этот live-результат относится к использованному профилю и проверенной машине.
 Проверка парсера, сборка приложения или отдельный SOCKS-запрос сами по себе
 не подтверждают работу полного VPN и всех вариантов протоколов.
+
+Проверки встроенного OpenConnect, 16.10.2026: Swift suite прошёл 48/48 тестов,
+включая отказ при отсутствующем/неисполняемом движке или скрипте без fallback
+на установленный Homebrew. Локальный TLS smoke прошёл как для исходного runtime,
+так и для подписанного движка из готового app bundle: копия в каталоге с пробелами
+запускается с чистым системным PATH, неизвестный CA и неверный pin отклоняются,
+явный локальный CA и верный pin позволяют отправить точный camouflage POST.
+Синтетический сервер намеренно возвращает HTTP 401: авторизация, DTLS,
+установка маршрутов/DNS и передача данных через VPN этим не подтверждены.
+Проверены arm64, deployment target macOS 14.0, отсутствие сторонних dylib,
+хеши manifest, синтаксис vpnc-script и подпись app bundle. Реальный ocserv-сеанс
+после смены TLS backend на OpenSSL и запуск на отдельном Mac ещё не проверены.
+
+Проверки ограничения журнала, 16.10.2026: Swift suite прошёл 48/48 тестов.
+Пять проверок журнала подтверждают порог 5 000 000 байт при потоке сообщений
+больше лимита, сохранение непрочитанных служебных событий, чтение после
+повторных ротаций без дублей, длинные Unicode/экранированные сообщения,
+границы порций чтения и конкурентный вывод движков. Три проверки очистки
+используют изолированные каталоги: активный UI или helper предотвращает
+удаление; после освобождения обеих блокировок каталог удаляется; посторонние
+каталоги, символические ссылки и старые сеансы без `lease` остаются.
+Проверки не запускают VPN, не меняют маршруты и не подтверждают новый handshake.
+
+Проверки переименования TLS-профиля, 16.10.2026: Swift suite прошёл 39/39
+тестов; два офлайн-теста ClientHello прошли на пересобранном `TunnelDeck.2`.
+Integration smoke подтвердил приём стандартного `chrome` и нового
+`tunneldeck_safari15_5` поставляемым core; локальные проверки OpenConnect и AWG
+также успешны. SHA-256 движка и patch обновлены согласованно, bundle собран
+и прошёл проверку подписи. Эти проверки не устанавливают новое VPN-соединение
+и не подтверждают новый серверный handshake или передачу данных.
 
 Проверки локального хранения, 16.10.2026: Swift suite прошёл 39/39 тестов,
 в том числе 12 проверок сохранения профилей. Подтверждены восстановление всех
@@ -517,6 +608,8 @@ manifest с хешами уже подписанных файлов. Patch, buil
 
 Основные тесты находятся в
 [ConfigurationTests.swift](../Tests/TunnelCoreTests/ConfigurationTests.swift),
+[SessionEventLogTests.swift](../Tests/TunnelCoreTests/SessionEventLogTests.swift),
+[PrivateSessionTests.swift](../Tests/TunnelCoreTests/PrivateSessionTests.swift),
 [SocksTunnelConfigurationTests.swift](../Tests/TunnelCoreTests/SocksTunnelConfigurationTests.swift),
 [ConnectionStatusTests.swift](../Tests/TunnelDeckTests/ConnectionStatusTests.swift),
 [ProfilePersistenceTests.swift](../Tests/TunnelDeckTests/ProfilePersistenceTests.swift),
@@ -534,13 +627,9 @@ manifest с хешами уже подписанных файлов. Patch, buil
   tests и повторять SOCKS-проверку и полный VPN с DNS и отключением.
 - Обновлять manifest, закреплённые SHA, сведения о модификациях и лицензии
   вместе с runtime. Не заменять изменённый core официальным бинарником без patch:
-  имя `shadowrocket_safari15_5` в upstream отсутствует.
+  имя `tunneldeck_safari15_5` в upstream отсутствует.
 - Новые протоколы в whitelist подтверждать отдельной проверкой их Endpoint,
   обходных маршрутов и настоящего обмена с сервером.
 
-Дополнительная история исследования хранится в
-[analysis/shadowrocket-tunnel-findings.txt](../../analysis/shadowrocket-tunnel-findings.txt),
-[analysis/shadowrocket-reality-findings.txt](../../analysis/shadowrocket-reality-findings.txt)
-и [analysis/protocol-compatibility-report.ru.txt](../../analysis/protocol-compatibility-report.ru.txt).
-Это материалы исследования; актуальное поведение определяют исходники приложения,
-закреплённый runtime, его patch и воспроизводимые проверки.
+Актуальное поведение определяют исходники приложения, закреплённый runtime,
+его patch и воспроизводимые проверки.

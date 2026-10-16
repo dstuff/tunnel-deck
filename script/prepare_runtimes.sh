@@ -18,7 +18,7 @@ fetch 'https://codeload.github.com/amnezia-vpn/amneziawg-tools/tar.gz/refs/tags/
 if [[ ! -f Runtime/xray/geoip.dat || ! -f Runtime/xray/geosite.dat || ! -f Runtime/xray/LICENSE ]]; then
     fetch 'https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-macos-arm64-v8a.zip' \
         .runtime-sources/xray.zip 2e93a67e8aa1936ecefb307e120830fcbd4c643ab9b1c46a2d0838d5f8409eaf
-    unzip -q -o .runtime-sources/xray.zip LICENSE README.md geoip.dat geosite.dat -d Runtime/xray
+    unzip -q -o .runtime-sources/xray.zip LICENSE geoip.dat geosite.dat -d Runtime/xray
 fi
 fetch 'https://github.com/heiher/hev-socks5-tunnel/releases/download/2.19.0/hev-socks5-tunnel-darwin-arm64' \
     Runtime/bin/hev-socks5-tunnel c72e2d99b698542105e10777a5105a60bb04f4d80bfbf95f20f3365cb77e5d47
@@ -36,7 +36,7 @@ make -C .runtime-sources/amneziawg-tools-3.1.20260812/src -j4
 cp .runtime-sources/amneziawg-tools-3.1.20260812/src/wg Runtime/bin/awg
 cp .runtime-sources/amneziawg-go-3.1.20260828/LICENSE Runtime/licenses/AmneziaWG-Go-LICENSE
 cp .runtime-sources/amneziawg-tools-3.1.20260812/COPYING Runtime/licenses/AmneziaWG-Tools-COPYING
-if ! command -v openconnect >/dev/null 2>&1; then brew install openconnect; fi
+bash "$ROOT_DIR/script/build_openconnect.sh"
 python3 script/runtime_manifest.py Runtime --verify-pins
 python3 script/runtime_manifest.py Runtime
 echo "Runtime engines are ready. Run ./script/build_and_run.sh"

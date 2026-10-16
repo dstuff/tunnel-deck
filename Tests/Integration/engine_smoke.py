@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unprivileged engine checks: no external server credentials or route changes."""
 import base64
+import argparse
 import hashlib
 import http.server
 import json
@@ -14,6 +15,7 @@ import threading
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+RUNTIME = ROOT / "Runtime"
 
 
 def run(args, **kwargs):
@@ -22,6 +24,10 @@ def run(args, **kwargs):
 
 
 def main():
+    global RUNTIME
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runtime-root", type=Path, default=RUNTIME)
+    RUNTIME = parser.parse_args().runtime_root.resolve()
     with tempfile.TemporaryDirectory(prefix="tunneldeck-engines-") as directory:
         temp = Path(directory)
         os.chmod(temp, 0o700)
@@ -56,19 +62,35 @@ def main():
         pin = "pin-sha256:" + base64.b64encode(hashlib.sha256(spki.stdout).digest()).decode()
         oc_config = temp / "openconnect.conf"
         oc_config.write_text("protocol=anyconnect\nnon-inter\nno-proxy\n"
-                             f"server=https://127.0.0.1:{server.server_port}/?fixture%2Fsecret\n"
-                             f"servercert={pin}\n")
+                             f"server=https://localhost:{server.server_port}/?fixture%2Fsecret\n")
         try:
-            oc = shutil.which("openconnect")
-            assert oc, "Install OpenConnect first"
-            result = run([oc, "--config", oc_config, "--cookieonly", "--no-passwd"])
-            assert targets and targets[0] == "/?fixture%2Fsecret", f"Initial camouflage URL changed: {targets}; {result.stderr}"
-            assert result.returncode != 0, "Fixture intentionally rejects authentication"
+            # Spaces and a clean environment expose dependencies on the build
+            # directory, Homebrew, DYLD_* or the invoking shell's PATH.
+            relocated = temp / "Moved TunnelDeck Runtime"
+            (relocated / "bin").mkdir(parents=True)
+            (relocated / "openconnect").mkdir()
+            oc = relocated / "bin/openconnect"
+            shutil.copy2(RUNTIME / "bin/openconnect", oc)
+            shutil.copy2(RUNTIME / "openconnect/vpnc-script", relocated / "openconnect/vpnc-script")
+            env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C", "HOME": str(temp)}
+            version = run([oc, "--version"], env=env, cwd=temp)
+            assert version.returncode == 0 and "OpenSSL 3.6.2" in version.stdout, version.stderr
+            result = run([oc, "--config", oc_config, "--cookieonly", "--no-passwd"], env=env, cwd=temp)
+            assert result.returncode != 0 and not targets, "Untrusted local TLS certificate was accepted"
+            for trust in [["--servercert", pin], ["--cafile", cert]]:
+                targets.clear()
+                result = run([oc, "--config", oc_config, "--cookieonly", "--no-passwd", *trust], env=env, cwd=temp)
+                assert targets and targets[0] == "/?fixture%2Fsecret", f"Initial camouflage URL changed: {targets}; {result.stderr}"
+                assert result.returncode != 0, "Fixture intentionally rejects authentication"
+            targets.clear()
+            wrong_pin = "pin-sha256:" + base64.b64encode(bytes(32)).decode()
+            result = run([oc, "--config", oc_config, "--cookieonly", "--no-passwd", "--servercert", wrong_pin], env=env, cwd=temp)
+            assert result.returncode != 0 and not targets, "Wrong server pin was accepted"
         finally:
             server.shutdown()
             server.server_close()
             thread.join(timeout=2)
-        print("PASS OpenConnect: pinned TLS, exact initial POST camouflage query; no login or tunnel")
+        print("PASS OpenConnect: relocated binary, clean PATH, TLS trust/pin rejection and acceptance, exact camouflage POST; no login or tunnel")
 
         test_key = base64.b64encode(bytes([7]) * 32).decode()
         awg_config = temp / "awg.conf"
@@ -92,23 +114,26 @@ PersistentKeepalive = 22-30
         # setconf parses the whole file before attempting IPC. This random,
         # nonexistent interface makes it stop before it can modify a device.
         interface = "tdcheck" + uuid.uuid4().hex[:8]
-        result = run([ROOT / "Runtime/bin/awg", "setconf", interface, awg_config])
+        result = run([RUNTIME / "bin/awg", "setconf", interface, awg_config])
         assert result.returncode != 0 and "No such file or directory" in result.stderr, result.stderr
         assert "Line unrecognized" not in result.stderr, result.stderr
         print("PASS AWG 3.1: official parser accepts header protection, ranges and I1/I3")
 
         xray_config = temp / "xray.json"
-        xray_config.write_text(json.dumps({"log": {"loglevel": "warning"}, "inbounds": [],
+        xray_fixture = {"log": {"loglevel": "warning"}, "inbounds": [],
             "outbounds": [{"protocol": "vless", "tag": "proxy", "settings": {
                 "vnext": [{"address": "192.0.2.5", "port": 443, "users": [{
                     "id": "28e21f5c-8e82-44a4-bb91-89e412af903b", "encryption": "none",
                     "flow": "xtls-rprx-vision"}]}]}, "streamSettings": {
                 "network": "raw", "security": "reality", "realitySettings": {
                     "serverName": "cover.example", "fingerprint": "chrome",
-                    "publicKey": "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE", "shortId": "abcd"}}}]}))
-        result = run([ROOT / "Runtime/xray/xray", "run", "-test", "-config", xray_config])
-        assert result.returncode == 0, result.stderr + result.stdout
-        print("PASS Xray: official engine accepts VLESS/REALITY configuration")
+                    "publicKey": "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE", "shortId": "abcd"}}}]}
+        for fingerprint in ["chrome", "tunneldeck_safari15_5"]:
+            xray_fixture["outbounds"][0]["streamSettings"]["realitySettings"]["fingerprint"] = fingerprint
+            xray_config.write_text(json.dumps(xray_fixture))
+            result = run([RUNTIME / "xray/xray", "run", "-test", "-config", xray_config])
+            assert result.returncode == 0, result.stderr + result.stdout
+        print("PASS Xray: bundled engine accepts VLESS/REALITY with standard and TunnelDeck TLS profiles")
 
 
 if __name__ == "__main__":

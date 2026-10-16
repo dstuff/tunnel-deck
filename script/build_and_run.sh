@@ -11,6 +11,7 @@ STAGED_BUNDLE="$STAGING_DIR/$APP_NAME.app"
 CONTENTS="$STAGED_BUNDLE/Contents"
 cd "$ROOT_DIR"
 python3 "$ROOT_DIR/script/runtime_manifest.py" "$ROOT_DIR/Runtime" --verify-pins
+python3 "$ROOT_DIR/script/verify_openconnect.py" "$ROOT_DIR/Runtime/bin/openconnect"
 
 if [[ "$MODE" != "--build-only" ]]; then
     pkill -x "$APP_NAME" >/dev/null 2>&1 || true
@@ -25,6 +26,8 @@ cp "$BUILD_DIR/TunnelDeckHelper" "$CONTENTS/Helpers/TunnelDeckHelper"
 mkdir -p "$CONTENTS/Resources/Runtime/source"
 cp "$ROOT_DIR/script/xray_compat.patch" "$CONTENTS/Resources/Runtime/source/xray_compat.patch"
 cp "$ROOT_DIR/script/build_xray_compat.sh" "$CONTENTS/Resources/Runtime/source/build_xray_compat.sh"
+cp "$ROOT_DIR/script/build_openconnect.sh" "$CONTENTS/Resources/Runtime/source/build_openconnect.sh"
+cp "$ROOT_DIR/script/verify_openconnect.py" "$CONTENTS/Resources/Runtime/source/verify_openconnect.py"
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -43,7 +46,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>NSHumanReadableCopyright</key><string>TunnelDeck. Third-party engine licenses are included in Resources/Runtime.</string>
 </dict></plist>
 PLIST
-for binary in "$CONTENTS/Helpers/TunnelDeckHelper" "$CONTENTS/Resources/Runtime/bin/amneziawg-go" "$CONTENTS/Resources/Runtime/bin/awg" "$CONTENTS/Resources/Runtime/bin/hev-socks5-tunnel" "$CONTENTS/Resources/Runtime/xray/xray"; do
+for binary in "$CONTENTS/Helpers/TunnelDeckHelper" "$CONTENTS/Resources/Runtime/bin/openconnect" "$CONTENTS/Resources/Runtime/bin/amneziawg-go" "$CONTENTS/Resources/Runtime/bin/awg" "$CONTENTS/Resources/Runtime/bin/hev-socks5-tunnel" "$CONTENTS/Resources/Runtime/xray/xray"; do
     if [[ -f "$binary" ]]; then /usr/bin/codesign --force --sign - --timestamp=none "$binary"; fi
 done
 python3 "$ROOT_DIR/script/runtime_manifest.py" "$CONTENTS/Resources/Runtime"

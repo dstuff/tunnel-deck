@@ -7,7 +7,8 @@ final class SecureSession {
     let redactor: LogRedactor
     private let events: Int32
     private let control: Int32
-    private let lock = NSLock()
+    private let lease: Int32
+    private let journal: SessionEventLog.Writer
     private var shouldStop = false
 
     init(path: String, userID: UInt32) throws {
@@ -34,20 +35,19 @@ final class SecureSession {
         events = try verified("events.jsonl", flags: O_WRONLY | O_APPEND, type: S_IFREG)
         do { control = try verified("control", flags: O_RDWR | O_NONBLOCK, type: S_IFIFO) }
         catch { close(events); throw error }
+        do { lease = try verified("lease", flags: O_RDONLY | O_CLOEXEC, type: S_IFREG) }
+        catch { close(events); close(control); throw error }
+        guard flock(lease, LOCK_SH | LOCK_NB) == 0 else {
+            close(events); close(control); close(lease)
+            throw VPNError("Не удалось удержать каталог VPN-сеанса.")
+        }
+        do { journal = try SessionEventLog.Writer(fileDescriptor: events) }
+        catch { close(events); close(control); close(lease); throw error }
         // Credentials are now in memory; do not leave the handoff file behind.
         _ = unlinkat(directory, "request.json", 0)
     }
     func emit(_ kind: TunnelEvent.Kind, _ message: String) {
-        lock.lock(); defer { lock.unlock() }
-        guard var bytes = try? JSONEncoder().encode(TunnelEvent(kind, redactor.redact(message))) else { return }
-        bytes.append(10)
-        bytes.withUnsafeBytes { raw in
-            var offset = 0
-            while offset < raw.count {
-                let n = write(events, raw.baseAddress!.advanced(by: offset), raw.count - offset)
-                if n <= 0 { break }; offset += n
-            }
-        }
+        try? journal.append(TunnelEvent(kind, redactor.redact(message)))
     }
     func stopping() -> Bool {
         var buffer = [UInt8](repeating: 0, count: 128)
@@ -55,7 +55,7 @@ final class SecureSession {
         if kill(request.parentPID, 0) != 0 && errno == ESRCH { shouldStop = true }
         return shouldStop || helperInterrupted
     }
-    deinit { close(events); close(control) }
+    deinit { close(events); close(control); close(lease) }
 }
 
 var helperInterrupted = false

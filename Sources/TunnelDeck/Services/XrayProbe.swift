@@ -11,8 +11,8 @@ import TunnelCore
         defer { session.remove() }
         let port = try LoopbackPort.available()
         let file = session.directory.appendingPathComponent("xray-probe.json")
-        if configuration.usesShadowrocketVisionTLS {
-            log("REALITY/Vision: используем TLS-профиль совместимости с Shadowrocket.")
+        if configuration.usesVisionCompatibilityTLS {
+            log("REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.")
         }
         let store = SCDynamicStoreCreate(nil, "TunnelDeck-probe" as CFString, nil, nil)
         let primary = store.flatMap { SCDynamicStoreCopyValue($0, "State:/Network/Global/IPv4" as CFString) as? [String: Any] }

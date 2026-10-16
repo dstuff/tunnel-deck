@@ -28,9 +28,9 @@ export GOMODCACHE="$XRAY_ROOT_DIR/.runtime-sources/go-mod"
 export GOTOOLCHAIN=go1.26.0
 export CGO_ENABLED=0 GOOS=darwin GOARCH=arm64
 go mod download
-go test ./transport/internet/reality -run '^TestShadowrocketSafari15' -count=1
+go test ./transport/internet/reality -run '^TestTunnelDeckSafari15' -count=1
 go build -trimpath -buildvcs=false -gcflags=all=-l=4 \
-    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.1 -s -w -buildid=' \
+    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.2 -s -w -buildid=' \
     -o "$XRAY_BUILD_DIR/xray-tunneldeck" ./main
 install -m 755 "$XRAY_BUILD_DIR/xray-tunneldeck" "$XRAY_ROOT_DIR/Runtime/xray/xray"
 "$XRAY_ROOT_DIR/Runtime/xray/xray" version

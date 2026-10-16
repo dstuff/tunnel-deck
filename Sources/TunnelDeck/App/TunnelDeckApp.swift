@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import TunnelCore
 
 @main struct TunnelDeckApp: App {
     @State private var model = AppModel.applicationModel()
@@ -40,6 +41,7 @@ import AppKit
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        PrivateSession.removeAbandoned()
         NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

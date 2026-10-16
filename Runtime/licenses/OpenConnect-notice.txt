@@ -1,0 +1,22 @@
+TunnelDeck bundles OpenConnect 9.21 as a separate command-line program, built
+from unmodified upstream source with statically linked OpenSSL 3.6.2. The GUI
+and privileged helper invoke this program; they do not link libopenconnect.
+
+OpenConnect: LGPL-2.1-only; see OpenConnect-COPYING.LGPL.
+Source: https://www.infradead.org/openconnect/download/openconnect-9.21.tar.gz
+OpenSSL: Apache-2.0; see OpenSSL-LICENSE.txt.
+Source: https://github.com/openssl/openssl/releases/download/openssl-3.6.2/openssl-3.6.2.tar.gz
+vpnc-script: GPL-2.0-or-later; the script retains its copyright and license
+header. The full GPL v2 text is included in AmneziaWG-Tools-COPYING.
+Source: https://gitlab.com/openconnect/vpnc-scripts/-/raw/ce9e961bd0f6b867e1c7c35f78f6fb973f6ff101/vpnc-script
+
+Pinned archive digests and build options are in script/build_openconnect.sh,
+also shipped in Runtime/source. Runtime/versions.json records the actual
+binary hash and source information. Rebuild using that script with Apple's
+command-line tools; Homebrew is not needed for this engine.
+
+The standalone build has TLS/DTLS and uses Apple's /etc/ssl/cert.pem for
+default CA verification. PKCS#11, SecurID/Yubikey hardware integration, GSSAPI,
+and external OpenSSL modules are not included. TunnelDeck's username/password,
+camouflage URL, server-certificate pin and no-DTLS controls remain available.
+The bundled network script is invoked explicitly by the helper's wrapper.

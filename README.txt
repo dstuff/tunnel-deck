@@ -1,7 +1,9 @@
 TunnelDeck — macOS VPN client, development build 0.1
 
 Requirements: macOS 14+, Apple Silicon, Xcode command-line tools, Go 1.24+
-(Go downloads the 1.25 toolchain required by the pinned AWG source), Homebrew.
+(Go downloads the toolchains required by the pinned AWG and Xray sources).
+The resulting app includes all three protocol engines; the destination Mac
+does not need Homebrew, Go or Xcode command-line tools.
 
 Build and launch:
   ./script/prepare_runtimes.sh     # first setup; downloads official engines
@@ -10,7 +12,7 @@ Build and launch:
   python3 Tests/Integration/engine_smoke.py  # local real-engine checks, no routes
 
 Open Package.swift in Xcode to work on the project. The project-local Codex
-Run action calls script/build_and_run.sh. No original Shadowrocket code is used.
+Run action calls script/build_and_run.sh.
 
 Application icon: selected concept 5 (interlocking links).
 Resources/AppIcon.png is the transparent master; Resources/AppIcon.icns is the
@@ -42,7 +44,12 @@ Implemented backends:
   The exact initial HTTPS URL is preserved;
   username/password via stdin; separate authgroup; optional certificate pin;
   default certificate verification; CSTP/DTLS; vpnc-script routing and DNS.
-  OpenConnect 9.21 and vpnc-script are installed through Homebrew on this Mac.
+  OpenConnect 9.21, statically linked OpenSSL 3.6.2 and the pinned vpnc-script
+  are bundled in the app, with no Homebrew runtime dependency. They are built
+  for arm64/macOS 14+ from verified source archives by script/build_openconnect.sh.
+  Default certificate verification uses Apple's /etc/ssl/cert.pem; a configured
+  server pin still applies. Hardware-token/PKCS#11/GSSAPI integrations are not
+  included in this standalone build; username/password authentication remains.
 • AmneziaWG: native official amneziawg-go tag v3.1.20260828 and awg-tools tag
   v3.1.20260812, both built from pinned archives. .conf import retains AWG
   protocol fields, padding, header protection, I1–I5 and timer ranges.
@@ -55,14 +62,13 @@ Implemented backends:
   JSON can carry VMess/Shadowsocks and other supported Xray outbounds.
   A separate HevSocks5Tunnel 2.19.0/lwIP engine supplies the IP/TCP packet layer
   and forwards TCP/UDP through a generated loopback SOCKS5 listener in Xray.
-  This follows the separation observed in Shadowrocket's native packet path;
-  it replaces the previous Xray-native TUN ingress. MTU is 4064, interface
+  This replaces the previous Xray-native TUN ingress. MTU is 4064, interface
   addresses are 198.18.0.1/24 and fd00:1234:ffff::10/64.
   The helper supplies routing/DNS and resolves server hostnames before capture.
   Server IPs have physical-gateway bypass routes. Direct outbounds are bound
   to the original physical interface; explicit imported socket options remain.
   For REALITY/Vision with generic Chrome/Safari fingerprints, a dedicated
-  ClientHello profile reproduces the observed Shadowrocket Safari15_5 settings
+  TunnelDeck ClientHello profile uses Safari15_5-compatible settings
   (ordinary X25519, no ALPN, one RSA-PSS/SHA384 signature entry). Explicit
   versioned Xray profiles remain intact. Saved user JSON is not rewritten.
   The patch does not change REALITY authentication/certificate verification.
@@ -103,12 +109,20 @@ Profile rows share the main window's profile-specific connection status.
 The menu bar uses a chain, a circled chain while busy, and a filled circle
 around the chain when connected.
 Application logs are sanitized before they reach the UI or its copy action.
+The on-disk session journal is capped at 5,000,000 bytes. Old diagnostic
+records are cleared at the limit, while the latest lifecycle events are retained.
+The UI tracks rotations without replaying events and keeps its last 1,200 entries.
+At startup, abandoned session directories are removed only when neither the UI
+nor helper holds their lease. Active sessions and legacy directories without
+a lease are left alone.
 
 This is a local, ad-hoc-signed development application, not an App Store build.
 It is not notarized or a production SMAppService privileged-helper installation.
-OpenConnect's Homebrew libraries are not embedded, so the app is not portable
-to a clean machine without installing that dependency. A production release
-needs signed/notarized packaging, privilege lifecycle review and integration
+All protocol engines and OpenConnect's network script are included. OpenConnect
+links only Apple system dylibs; its OpenSSL code is statically included.
+Packaging checks verify this and the macOS 14 deployment target. Launch on an
+older macOS or a separate clean Mac still requires verification. A production
+release needs signed/notarized packaging, privilege lifecycle review and integration
 testing for sleep, roaming, forced engine failure and IPv6-only networks.
 
 Current testing scope:
@@ -117,11 +131,15 @@ AWG advanced parameters, Xray import/isolation and credential redaction.
 The Swift suite also covers automatic persistence/reload for every protocol,
 legacy migration, profile selection, file permissions, failed writes, damaged or
 unsupported documents, pending edits on deletion, incomplete server input, and
-profile-specific status indicators. The current suite passes 39 tests, including
-12 persistence tests. Persistence tests use temporary files and
+profile-specific status indicators. The current suite passes 48 tests, including
+12 persistence tests and 8 bounded-journal/session-cleanup tests. Tests use temporary files and
 synthetic credentials, without accessing real user profiles or Keychain.
-Local real-engine checks passed: OpenConnect sends
-the exact initial camouflage POST over pinned TLS; official AWG tools parse
+Local real-engine checks passed: relocated bundled OpenConnect runs with a
+clean system PATH, rejects an untrusted certificate/wrong pin and sends the
+exact initial camouflage POST with an explicit CA or valid pin. These tests
+passed for both the source runtime and the signed app copy, without login,
+DTLS, route changes or VPN data transfer. A real ocserv session using the new
+OpenSSL backend has not yet been verified. Official AWG tools parse
 3.1 ranges/header protection/I1/I3; Xray parses a VLESS/REALITY configuration.
 The app's live TLS/HTTP check of the supplied ocserv endpoint returned its
 authentication form with a valid certificate. No credentials are in this repo.
@@ -139,8 +157,8 @@ and two offline ClientHello tests passed; the current Swift suite is described a
 IPv6-only upstreams and sleep/roaming remain outside this live verification.
 The patched core rebuilds reproducibly from the pinned source plus repo patch;
 the app bundle includes that patch and the third-party license notice.
-Static findings and runtime limitations are recorded in
-../analysis/shadowrocket-xray-compatibility.txt and related investigation files.
+Implementation details, verification results and runtime limitations are
+recorded in docs/PROTOCOLS.md.
 
 Pinned upstream sources:
 https://www.infradead.org/openconnect/

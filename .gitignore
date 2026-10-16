@@ -3,6 +3,7 @@
 dist/
 .runtime-sources/
 Runtime/bin/
+Runtime/openconnect/
 Runtime/xray/
 *.log
 .DS_Store

@@ -3,7 +3,7 @@ import Darwin
 import TunnelCore
 
 func environment(runtime: RuntimePaths) -> [String: String] {
-    ["PATH": runtime.root.appendingPathComponent("bin").path + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    ["PATH": runtime.root.appendingPathComponent("bin").path + ":/usr/bin:/bin:/usr/sbin:/sbin",
      "HOME": "/var/root", "LC_ALL": "C", "XRAY_LOCATION_ASSET": runtime.root.appendingPathComponent("xray").path]
 }
 

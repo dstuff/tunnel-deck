@@ -8,15 +8,19 @@ public struct RuntimePaths: Sendable {
     public var amnezia: String { root.appendingPathComponent("bin/amneziawg-go").path }
     public var awg: String { root.appendingPathComponent("bin/awg").path }
     public var openconnect: String? {
-        ["/opt/homebrew/bin/openconnect", "/usr/local/bin/openconnect"].first { FileManager.default.isExecutableFile(atPath: $0) }
+        let path = root.appendingPathComponent("bin/openconnect").path
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
     }
     public var vpncScript: String? {
-        ["/opt/homebrew/etc/vpnc/vpnc-script", "/usr/local/etc/vpnc/vpnc-script"].first { FileManager.default.isExecutableFile(atPath: $0) }
+        let path = root.appendingPathComponent("openconnect/vpnc-script").path
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
     }
     public func check(_ kind: VPNProtocol) throws {
         switch kind {
         case .openConnect:
-            guard openconnect != nil, vpncScript != nil else { throw VPNError("OpenConnect не установлен. Выполните brew install openconnect.") }
+            guard openconnect != nil, vpncScript != nil else {
+                throw VPNError("В сборке отсутствует OpenConnect или сетевой скрипт. Переустановите TunnelDeck.")
+            }
         case .amneziaWG:
             guard FileManager.default.isExecutableFile(atPath: amnezia), FileManager.default.isExecutableFile(atPath: awg) else {
                 throw VPNError("В сборке отсутствует движок AmneziaWG 3.1. Запустите script/prepare_runtimes.sh.")

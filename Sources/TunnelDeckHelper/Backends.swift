@@ -101,8 +101,8 @@ final class BackendRunner {
     }
     func xray() throws {
         let config = try XrayConfiguration(session.request.secrets.configuration)
-        if config.usesShadowrocketVisionTLS {
-            session.emit(.log, "REALITY/Vision: используем TLS-профиль совместимости с Shadowrocket.")
+        if config.usesVisionCompatibilityTLS {
+            session.emit(.log, "REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.")
         }
         let network = try NetworkConfiguration(session: session)
         var xrayChild: EngineProcess?

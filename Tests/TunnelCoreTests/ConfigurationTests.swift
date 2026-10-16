@@ -148,10 +148,12 @@ final class ConfigurationTests: XCTestCase {
             let stream = try XCTUnwrap(outbound["streamSettings"] as? [String: Any])
             return (stream["realitySettings"] as? [String: Any])?["fingerprint"] as? String
         }
-        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "chrome"), "shadowrocket_safari15_5")
-        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "chrome", physical: "en0"), "shadowrocket_safari15_5")
-        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: ""), "shadowrocket_safari15_5")
-        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "safari"), "shadowrocket_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "chrome"), "tunneldeck_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "chrome", physical: "en0"), "tunneldeck_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: ""), "tunneldeck_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "safari"), "tunneldeck_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "safari15_5"), "tunneldeck_safari15_5")
+        XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "tunneldeck_safari15_5"), "tunneldeck_safari15_5")
         XCTAssertEqual(try fingerprint(flow: "", preset: "chrome"), "chrome")
         XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "hellochrome_131"), "hellochrome_131")
         XCTAssertEqual(try fingerprint(flow: "xtls-rprx-vision", preset: "firefox"), "firefox")

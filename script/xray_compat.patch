@@ -7,7 +7,7 @@
 -}
 +
 +	// Opt-in REALITY raw compatibility profile; reality.UClient applies the custom spec.
-+	"shadowrocket_safari15_5": &utls.HelloSafari_16_0,
++	"tunneldeck_safari15_5": &utls.HelloSafari_16_0,
 +}
 --- a/transport/internet/reality/reality.go
 +++ b/transport/internet/reality/reality.go
@@ -16,8 +16,8 @@
  		return nil, errors.New("REALITY: failed to get fingerprint").AtError()
  	}
 -	uConn.UConn = utls.UClient(c, utlsConfig, *fingerprint)
-+	if config.Fingerprint == "shadowrocket_safari15_5" {
-+		spec, err := shadowrocketSafari15Spec()
++	if config.Fingerprint == "tunneldeck_safari15_5" {
++		spec, err := tunnelDeckSafari15Spec()
 +		if err != nil {
 +			return nil, errors.New("REALITY: failed to build Safari compatibility profile").Base(err)
 +		}
@@ -32,16 +32,16 @@
  		uConn.BuildHandshakeState()
  		hello := uConn.HandshakeState.Hello
 --- /dev/null
-+++ b/transport/internet/reality/shadowrocket_safari15.go
++++ b/transport/internet/reality/tunneldeck_safari15.go
 @@ -0,0 +1,36 @@
 +package reality
 +
 +import utls "github.com/refraction-networking/utls"
 +
-+// shadowrocketSafari15Spec is an opt-in compatibility profile using only
++// tunnelDeckSafari15Spec is an opt-in compatibility profile using only
 +// public uTLS presets and observed configuration values. It does not reproduce
 +// BoringSSL's exact extension serialization or native TCP behavior.
-+func shadowrocketSafari15Spec() (*utls.ClientHelloSpec, error) {
++func tunnelDeckSafari15Spec() (*utls.ClientHelloSpec, error) {
 +	spec, err := utls.UTLSIdToSpec(utls.HelloSafari_16_0)
 +	if err != nil {
 +		return nil, err
@@ -71,7 +71,7 @@
 +	return &spec, nil
 +}
 --- /dev/null
-+++ b/transport/internet/reality/shadowrocket_safari15_test.go
++++ b/transport/internet/reality/tunneldeck_safari15_test.go
 @@ -0,0 +1,75 @@
 +package reality
 +
@@ -83,11 +83,11 @@
 +	"github.com/xtls/xray-core/transport/internet/tls"
 +)
 +
-+func TestShadowrocketSafari15ClientHello(t *testing.T) {
-+	if tls.GetFingerprint("shadowrocket_safari15_5") == nil {
++func TestTunnelDeckSafari15ClientHello(t *testing.T) {
++	if tls.GetFingerprint("tunneldeck_safari15_5") == nil {
 +		t.Fatal("experimental profile must pass Xray fingerprint validation")
 +	}
-+	spec, err := shadowrocketSafari15Spec()
++	spec, err := tunnelDeckSafari15Spec()
 +	if err != nil {
 +		t.Fatal(err)
 +	}
@@ -133,8 +133,8 @@
 +	}
 +}
 +
-+func TestShadowrocketSafari15DoesNotMutateStockSafari(t *testing.T) {
-+	if _, err := shadowrocketSafari15Spec(); err != nil {
++func TestTunnelDeckSafari15DoesNotMutateStockSafari(t *testing.T) {
++	if _, err := tunnelDeckSafari15Spec(); err != nil {
 +		t.Fatal(err)
 +	}
 +	spec, err := utls.UTLSIdToSpec(utls.HelloSafari_16_0)

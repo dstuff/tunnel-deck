@@ -1,5 +1,28 @@
 [
   {
+    "name": "openconnect",
+    "path": "bin/openconnect",
+    "version": "9.21",
+    "source": "https://www.infradead.org/openconnect/download/openconnect-9.21.tar.gz",
+    "sha256": "a111ab17121c5ed7b4a08cadb8c680e6dbe004ef131a2ce124aa405cd3656d21",
+    "distribution": "TunnelDeck standalone source build; static OpenSSL; Apple system dylibs only",
+    "sourceArchiveSha256": "5b32369467db6e5f317aa1ed12cfcbb81ed00bdbc765450b6bfcbdc300944a58",
+    "tlsLibrary": "OpenSSL 3.6.2 (static)",
+    "tlsSourceArchive": "https://github.com/openssl/openssl/releases/download/openssl-3.6.2/openssl-3.6.2.tar.gz",
+    "tlsSourceArchiveSha256": "aaf51a1fe064384f811daeaeb4ec4dce7340ec8bd893027eee676af31e83a04f",
+    "systemCAFile": "/etc/ssl/cert.pem",
+    "minimumMacOS": "14.0",
+    "buildScript": "script/build_openconnect.sh",
+    "buildScriptSha256": "80cc777ef92284077c60a9dbede04c1a30723c2ab0d4826d909c706dd2e33cc0"
+  },
+  {
+    "name": "vpnc-script",
+    "path": "openconnect/vpnc-script",
+    "version": "ce9e961bd0f6b867e1c7c35f78f6fb973f6ff101",
+    "source": "https://gitlab.com/openconnect/vpnc-scripts/-/blob/ce9e961bd0f6b867e1c7c35f78f6fb973f6ff101/vpnc-script",
+    "sha256": "f0c4d936a382f07711263242699b5e2d85d1ace37136bb78785d352997c17742"
+  },
+  {
     "name": "amneziawg-go",
     "path": "bin/amneziawg-go",
     "version": "3.1.20260828",
@@ -16,14 +39,14 @@
   {
     "name": "xray",
     "path": "xray/xray",
-    "version": "26.3.27+tunneldeck.1",
+    "version": "26.3.27+tunneldeck.2",
     "source": "https://github.com/XTLS/Xray-core/tree/v26.3.27",
-    "sha256": "ef4dcf1839b70d56583bbeb23de1d9977694f671e8eab3a98b4826f9d6f2cbe5",
+    "sha256": "55141dd823f4410df6e763e70310fb830f59b1982a335e4e0c1a8ecf4661c317",
     "distribution": "TunnelDeck modified source build",
     "sourceArchive": "https://github.com/XTLS/Xray-core/archive/refs/tags/v26.3.27.tar.gz",
     "sourceArchiveSha256": "992a4997e6bb846d11469435d687f99ef812fcde1e0a009bb8e95189ea20331d",
     "patch": "script/xray_compat.patch",
-    "patchSha256": "a87d036fa9d3ba8653e4b1cd4f4d3a99c456f0165133161a4602a70272d3a9ae",
+    "patchSha256": "27833e40009ddb88aa006d62d69cfc5f607a9a0b623a0eae8319b1e173407776",
     "toolchain": "go1.26.0",
     "buildScript": "script/build_xray_compat.sh"
   },

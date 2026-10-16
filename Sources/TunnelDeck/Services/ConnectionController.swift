@@ -189,15 +189,9 @@ import TunnelCore
     private func startMonitoring(_ session: PrivateSession) {
         monitor?.cancel()
         monitor = Task { @MainActor [weak self] in
-            guard let file = try? FileHandle(forReadingFrom: session.eventFile) else { return }
-            defer { try? file.close() }
-            var pending = Data()
+            guard let reader = try? SessionEventLog.Reader(file: session.eventFile) else { return }
             while !Task.isCancelled {
-                if let data = try? file.read(upToCount: 128_000), !data.isEmpty { pending.append(data) }
-                while let end = pending.firstIndex(of: 10) {
-                    let line = Data(pending[..<end]); pending.removeSubrange(...end)
-                    if let event = try? JSONDecoder().decode(TunnelEvent.self, from: line) { self?.receive(event) }
-                }
+                for event in (try? reader.readAvailable()) ?? [] { self?.receive(event) }
                 try? await Task.sleep(for: .milliseconds(250))
             }
         }
