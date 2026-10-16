@@ -151,7 +151,8 @@ struct RoutingView: View {
                 Divider()
                 Button(rule.enabled ? "Выключить" : "Включить") { if let value = binding(for: rule.id) { value.wrappedValue.enabled.toggle() } }
                 Button("Удалить", role: .destructive) { deleteRule(rule.id) }
-            } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).frame(width: 24)
+            } label: { Image(systemName: "ellipsis") }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 24)
                 .accessibilityLabel("Действия с правилом \(index + 1)")
         }
         .padding(.horizontal, 17).padding(.vertical, 10)
