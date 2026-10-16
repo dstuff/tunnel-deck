@@ -8,7 +8,9 @@ import sys
 root = Path(sys.argv[1])
 release_inputs = {
     "bin/openconnect": "a111ab17121c5ed7b4a08cadb8c680e6dbe004ef131a2ce124aa405cd3656d21",
-    "xray/xray": "55141dd823f4410df6e763e70310fb830f59b1982a335e4e0c1a8ecf4661c317",
+    "xray/xray": "695a9f308191a612f48d7e89f6379067ff35c6933772fb4432d1876a41b54643",
+    "geoip/geoip.dat": "6c41fbfcc29a2503b442ae8a1dc51edbf2d99a0511aecd798feecac6cb95aaa2",
+    "geoip/countries.bin": "3b29d2a81a6f318fad179ce4284cb22e53b8d41b2a61c4d28925a410c4b53662",
     "bin/hev-socks5-tunnel": "c72e2d99b698542105e10777a5105a60bb04f4d80bfbf95f20f3365cb77e5d47",
     "licenses/HevSocks5Tunnel-LICENSE": "3cca1a91ca82e9b9c41852945ef15858f932828ceeb765b86bc1fe3f39127514",
     "openconnect/vpnc-script": "f0c4d936a382f07711263242699b5e2d85d1ace37136bb78785d352997c17742",
@@ -32,10 +34,12 @@ entries = [
      "https://github.com/amnezia-vpn/amneziawg-go/tree/v3.1.20260828"),
     ("awg", "bin/awg", "3.1.20260812",
      "https://github.com/amnezia-vpn/amneziawg-tools/tree/v3.1.20260812"),
-    ("xray", "xray/xray", "26.3.27+tunneldeck.2",
+    ("xray", "xray/xray", "26.3.27+tunneldeck.3",
      "https://github.com/XTLS/Xray-core/tree/v26.3.27"),
     ("hev-socks5-tunnel", "bin/hev-socks5-tunnel", "2.19.0",
      "https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.19.0"),
+    ("country-rules", "geoip/geoip.dat", "DB-IP Lite 2026-10", "https://db-ip.com/db/download/ip-to-country-lite"),
+    ("country-index", "geoip/countries.bin", "DB-IP Lite 2026-10", "https://db-ip.com/db/download/ip-to-country-lite"),
 ]
 manifest = [{"name": name, "path": path, "version": version, "source": source,
              "sha256": hashlib.sha256((root / path).read_bytes()).hexdigest()}
@@ -63,5 +67,7 @@ for entry in manifest:
             "patchSha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
             "toolchain": "go1.26.0",
             "buildScript": "script/build_xray_compat.sh",
+            "routingSources": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                               for p in sorted((patch.parent / "xray-routing").glob("*.go"))},
         })
 (root / "versions.json").write_text(json.dumps(manifest, indent=2) + "\n")

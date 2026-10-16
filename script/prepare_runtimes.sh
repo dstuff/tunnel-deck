@@ -37,6 +37,7 @@ cp .runtime-sources/amneziawg-tools-3.1.20260812/src/wg Runtime/bin/awg
 cp .runtime-sources/amneziawg-go-3.1.20260828/LICENSE Runtime/licenses/AmneziaWG-Go-LICENSE
 cp .runtime-sources/amneziawg-tools-3.1.20260812/COPYING Runtime/licenses/AmneziaWG-Tools-COPYING
 bash "$ROOT_DIR/script/build_openconnect.sh"
+python3 "$ROOT_DIR/script/prepare_geoip.py"
 python3 script/runtime_manifest.py Runtime --verify-pins
 python3 script/runtime_manifest.py Runtime
 echo "Runtime engines are ready. Run ./script/build_and_run.sh"

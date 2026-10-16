@@ -39,16 +39,20 @@
   {
     "name": "xray",
     "path": "xray/xray",
-    "version": "26.3.27+tunneldeck.2",
+    "version": "26.3.27+tunneldeck.3",
     "source": "https://github.com/XTLS/Xray-core/tree/v26.3.27",
-    "sha256": "55141dd823f4410df6e763e70310fb830f59b1982a335e4e0c1a8ecf4661c317",
+    "sha256": "695a9f308191a612f48d7e89f6379067ff35c6933772fb4432d1876a41b54643",
     "distribution": "TunnelDeck modified source build",
     "sourceArchive": "https://github.com/XTLS/Xray-core/archive/refs/tags/v26.3.27.tar.gz",
     "sourceArchiveSha256": "992a4997e6bb846d11469435d687f99ef812fcde1e0a009bb8e95189ea20331d",
     "patch": "script/xray_compat.patch",
-    "patchSha256": "27833e40009ddb88aa006d62d69cfc5f607a9a0b623a0eae8319b1e173407776",
+    "patchSha256": "5434f229132d11395aa910bffece591738f35da6759f3a14b02d8c138c781ff6",
     "toolchain": "go1.26.0",
-    "buildScript": "script/build_xray_compat.sh"
+    "buildScript": "script/build_xray_compat.sh",
+    "routingSources": {
+      "fake_persistence.go": "d3a38d103db8fdf31489b2343ed475ec78f16c223dbf1aae6bdb8253340cf98d",
+      "fake_persistence_test.go": "96cfe7518a31ceeefb64f29690dd3071f8ce42172f833e113e89f0445a21db89"
+    }
   },
   {
     "name": "hev-socks5-tunnel",
@@ -56,5 +60,19 @@
     "version": "2.19.0",
     "source": "https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.19.0",
     "sha256": "c72e2d99b698542105e10777a5105a60bb04f4d80bfbf95f20f3365cb77e5d47"
+  },
+  {
+    "name": "country-rules",
+    "path": "geoip/geoip.dat",
+    "version": "DB-IP Lite 2026-10",
+    "source": "https://db-ip.com/db/download/ip-to-country-lite",
+    "sha256": "6c41fbfcc29a2503b442ae8a1dc51edbf2d99a0511aecd798feecac6cb95aaa2"
+  },
+  {
+    "name": "country-index",
+    "path": "geoip/countries.bin",
+    "version": "DB-IP Lite 2026-10",
+    "source": "https://db-ip.com/db/download/ip-to-country-lite",
+    "sha256": "3b29d2a81a6f318fad179ce4284cb22e53b8d41b2a61c4d28925a410c4b53662"
   }
 ]

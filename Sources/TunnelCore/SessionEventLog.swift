@@ -35,7 +35,7 @@ public enum SessionEventLog {
             guard maximumBytes >= 4096 else { throw VPNError("Недопустимый размер журнала.") }
             descriptor = fileDescriptor
             limit = maximumBytes
-            // Five state kinds, one new record and a header always fit together.
+            // Six state kinds, one new record and a header always fit together.
             recordLimit = min(64_000, (maximumBytes - SessionEventLog.headerSize) / 8)
             let flags = fcntl(descriptor, F_GETFL)
             guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_APPEND) == 0 else {

@@ -5,7 +5,7 @@ import TunnelCore
 
 @MainActor enum XrayProbe {
     /// Exercise the actual outbound without installing TUN routes or changing DNS.
-    static func check(configuration: XrayConfiguration, runtime: RuntimePaths,
+    static func check(configuration: XrayConfiguration, runtime: RuntimePaths, selectedOutbound: String? = nil,
                       log: @escaping (String) -> Void) async throws {
         let session = try PrivateSession()
         defer { session.remove() }
@@ -17,7 +17,7 @@ import TunnelCore
         let store = SCDynamicStoreCreate(nil, "TunnelDeck-probe" as CFString, nil, nil)
         let primary = store.flatMap { SCDynamicStoreCopyValue($0, "State:/Network/Global/IPv4" as CFString) as? [String: Any] }
         let interface = primary?["PrimaryInterface"] as? String
-        try PrivateSession.write(configuration.probeData(port: port, physicalInterface: interface), to: file)
+        try PrivateSession.write(configuration.selectedProbeData(port: port, selected: selectedOutbound, physicalInterface: interface ?? ""), to: file)
         let engine = ProcessRunner()
         let task = Task {
             try await engine.run(runtime.xray, ["run", "-config", file.path], timeout: 35, logStandardOutput: true, log: log)

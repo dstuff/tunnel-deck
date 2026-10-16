@@ -35,7 +35,35 @@ UI verification: ./script/build_and_run.sh --preview launches a DEBUG-only
 isolated design preview with synthetic profiles in a separate temporary file. Connect,
 disconnect and check are simulated in that mode: no helper or network
 requests. Normal launch uses the actual saved profiles and engines. The selected
-mock and visual QA evidence are in Design/ConnectionList/ and design-qa.md.
+mock and visual QA evidence are in Design/ConnectionList/. Routing preview:
+./script/build_and_run.sh --routing-preview. This builds a separate
+dist/TunnelDeck Preview.app with an isolated bundle ID and never stops the normal
+app. Routing reference and comparisons are in Design/Routing/; the latest report
+is design-qa.md.
+
+Shared routing:
+Open Routing from the main window, settings, menu bar, or Option-Command-R.
+One ordered policy is used by every connection. The first enabled match wins;
+otherwise the selected default (VPN/direct) applies. The split editor supports
+sites with or without subdomains, IPv4/IPv6 addresses/subnets, and IP countries.
+Actions are VPN, direct and block. Changes autosave; use Apply and Reconnect to
+apply them to an active connection. The current helper keeps its original snapshot.
+
+Import/export uses standalone .tunneldeck-routing JSON, limited to 128 KB and 1000
+rules. It contains no profiles, passwords or keys. Import previews all rules before
+replacing the current scheme and never connects automatically. Example:
+docs/examples/sites-and-countries.tunneldeck-routing. The address inspector explains
+which rule matches; it is not a connectivity test. Country data is bundled DB-IP
+Lite (CC BY 4.0), generated reproducibly by script/prepare_geoip.py.
+
+All backends now require the bundled common Xray/Hev router. Native OpenConnect
+and AWG interfaces provide scoped VPN channels, while the front utun captures
+TCP/UDP for policy decisions. Existing on-link/loopback routes remain system-owned.
+Imported Xray routing/dns/policy/inbounds are replaced at runtime by the shared
+scheme. Multiple server outbounds require a primary-server selection; its explicit
+dialer chain is preserved. FakeDNS identities persist privately across reconnects;
+HTTP Host/SNI cannot override a known DNS identity. Apps with their own encrypted
+DNS or cached real IPs fall back to IP/country/default decisions.
 
 Implemented backends:
 • OpenConnect / ocserv: a single server field accepts the complete HTTPS URL,
@@ -43,7 +71,7 @@ Implemented backends:
   together automatically; changing/removing the query replaces the old secret.
   The exact initial HTTPS URL is preserved;
   username/password via stdin; separate authgroup; optional certificate pin;
-  default certificate verification; CSTP/DTLS; vpnc-script routing and DNS.
+  default certificate verification; CSTP/DTLS; validated network callbacks into the shared router.
   OpenConnect 9.21, statically linked OpenSSL 3.6.2 and the pinned vpnc-script
   are bundled in the app, with no Homebrew runtime dependency. They are built
   for arm64/macOS 14+ from verified source archives by script/build_openconnect.sh.
@@ -53,7 +81,8 @@ Implemented backends:
 • AmneziaWG: native official amneziawg-go tag v3.1.20260828 and awg-tools tag
   v3.1.20260812, both built from pinned archives. .conf import retains AWG
   protocol fields, padding, header protection, I1–I5 and timer ranges.
-  The helper configures utun, endpoint bypass routes, AllowedIPs and DNS.
+  The helper configures the native utun and scoped AllowedIPs; the shared
+  Xray/Hev path applies user rules and DNS for all three backends.
   The bundled daemon's --version retains the upstream historical build string;
   Runtime/versions.json records the actual source tag and binary hash.
 • Xray: Xray 26.3.27 + TunnelDeck compatibility patch for macOS arm64, built
@@ -66,7 +95,8 @@ Implemented backends:
   addresses are 198.18.0.1/24 and fd00:1234:ffff::10/64.
   The helper supplies routing/DNS and resolves server hostnames before capture.
   Server IPs have physical-gateway bypass routes. Direct outbounds are bound
-  to the original physical interface; explicit imported socket options remain.
+  to the original physical interface. Server transports are also constrained to
+  that interface; other imported socket options remain.
   For REALITY/Vision with generic Chrome/Safari fingerprints, a dedicated
   TunnelDeck ClientHello profile uses Safari15_5-compatible settings
   (ordinary X25519, no ALPN, one RSA-PSS/SHA384 signature entry). Explicit
@@ -95,8 +125,8 @@ Authentication password is not forwarded to the root helper: only its cookie.
 The helper creates root-only working files and removes them after stopping.
 All profile data, including passwords, camouflage, original AWG/Xray configurations,
 unfinished server input and the selected profile, is saved automatically to
-~/Library/Application Support/TunnelDeck/profiles.json. The version 2 JSON document
-contains profile metadata and secrets indexed by profile UUID. It has no additional
+~/Library/Application Support/TunnelDeck/profiles.json. The version 3 JSON document
+contains profile metadata, secrets indexed by profile UUID, and the shared routing policy. It has no additional
 encryption; the directory is restricted to 0700 and files to 0600. Replacement is
 atomic, with a private temporary file. The app does not access Keychain and has no
 option to disable persistence for individual profiles. Pending edits are flushed
@@ -167,3 +197,13 @@ https://github.com/amnezia-vpn/amneziawg-tools/tree/v3.1.20260812
 https://github.com/XTLS/Xray-core/releases/tag/v26.3.27
 https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.19.0
 Licenses are in Runtime/licenses and Runtime/xray/LICENSE (bundled in the app).
+
+Routing validation (from TunnelDeck/):
+  swift test
+  python3 Tests/Integration/routing_smoke.py
+  python3 Tests/Integration/engine_smoke.py
+  ./script/build_and_run.sh --build-only
+The routing smoke uses the actual Swift compiler output and bundled core with
+synthetic loopback TCP/UDP/DNS/GeoIP fixtures. It does not create utun, change
+system routes/DNS, or prove a new remote VPN handshake/data session. See
+docs/PROTOCOLS.md for verified boundaries and remaining live checks.

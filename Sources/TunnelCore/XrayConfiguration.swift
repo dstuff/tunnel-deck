@@ -29,11 +29,101 @@ public struct XrayConfiguration {
     }
 
     public var endpointHosts: [String] {
-        (configuration["outbounds"] as? [[String: Any]] ?? []).flatMap { outbound -> [String] in
+        Self.endpointHosts(in: configuration["outbounds"] as? [[String: Any]] ?? [])
+    }
+
+    /// Bootstrap only the chosen chain; an unused server must not prevent connection.
+    public func endpointHosts(selected: String?) throws -> [String] {
+        Self.endpointHosts(in: try routedOutbounds(selected: selected, physicalInterface: "", resolvedHosts: [:]))
+    }
+
+    private static func endpointHosts(in outbounds: [[String: Any]]) -> [String] {
+        outbounds.flatMap { outbound -> [String] in
             let settings = outbound["settings"] as? [String: Any] ?? [:]
-            return ["vnext", "servers"].flatMap { key in
+            var hosts = ["vnext", "servers"].flatMap { key in
                 (settings[key] as? [[String: Any]] ?? []).compactMap { $0["address"] as? String }
             }
+            if outbound["protocol"] as? String == "hysteria", let host = settings["address"] as? String { hosts.append(host) }
+            if outbound["protocol"] as? String == "wireguard" {
+                hosts += (settings["peers"] as? [[String: Any]] ?? []).compactMap { peer in
+                    guard let endpoint = peer["endpoint"] as? String else { return nil }
+                    return URLComponents(string: "udp://" + endpoint)?.host?.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                }
+            }
+            return hosts
+        }
+    }
+
+    public struct OutboundChoice: Identifiable, Equatable, Sendable {
+        public let tag: String
+        public let title: String
+        public var id: String { tag }
+    }
+    public var outboundChoices: [OutboundChoice] {
+        (configuration["outbounds"] as? [[String: Any]] ?? []).enumerated().compactMap { index, item in
+            guard let proto = item["protocol"] as? String, !["freedom", "blackhole", "dns"].contains(proto) else { return nil }
+            let tag = item["tag"] as? String ?? "outbound-\(index + 1)"
+            return .init(tag: tag, title: "\(tag) · \(proto)")
+        }
+    }
+    public func selectedOutboundTag(_ selected: String?) throws -> String {
+        if let selected, outboundChoices.contains(where: { $0.tag == selected }) { return selected }
+        guard outboundChoices.count == 1, let only = outboundChoices.first else {
+            throw VPNError(outboundChoices.isEmpty ? "В Xray нет серверного подключения для действия «Через VPN»." : "В конфигурации несколько серверов Xray. Выберите основной в настройках подключения.")
+        }
+        return only.tag
+    }
+
+    /// Extract only the chosen transport and its explicit dialer dependencies. Imported routing never runs here.
+    public func routedOutbounds(selected: String?, physicalInterface: String, resolvedHosts: [String: String]) throws -> [[String: Any]] {
+        let selected = try selectedOutboundTag(selected)
+        let generated = try JSONSerialization.jsonObject(with: proxyData(port: 1, physicalInterface: physicalInterface, resolvedHosts: resolvedHosts)) as! [String: Any]
+        let source = generated["outbounds"] as! [[String: Any]]
+        let tags = source.enumerated().map { $0.element["tag"] as? String ?? "outbound-\($0.offset + 1)" }
+        guard Set(tags).count == tags.count else { throw VPNError("Имена outbounds Xray должны быть уникальными.") }
+        var included = Set<Int>(), visiting = Set<Int>()
+        func dependency(_ item: [String: Any]) -> String? {
+            let stream = item["streamSettings"] as? [String: Any] ?? [:]
+            return (stream["sockopt"] as? [String: Any])?["dialerProxy"] as? String ?? (item["proxySettings"] as? [String: Any])?["tag"] as? String
+        }
+        func visit(_ tag: String) throws {
+            guard let index = tags.firstIndex(of: tag), !visiting.contains(index) else { throw VPNError("Цепочка Xray содержит цикл или неизвестный outbound.") }
+            if included.contains(index) { return }
+            visiting.insert(index)
+            if let next = dependency(source[index]), !next.isEmpty { try visit(next) }
+            visiting.remove(index); included.insert(index)
+        }
+        try visit(selected)
+        let mapped = Dictionary(uniqueKeysWithValues: included.map { (tags[$0], tags[$0] == selected ? "td-vpn" : "td-source-\($0)") })
+        return included.sorted().map { index in
+            var item = source[index]
+            item["tag"] = mapped[tags[index]]!
+            var stream = item["streamSettings"] as? [String: Any] ?? [:]
+            var sockopt = stream["sockopt"] as? [String: Any] ?? [:]
+            if let tag = sockopt["dialerProxy"] as? String { sockopt["dialerProxy"] = mapped[tag] }
+            else { sockopt["interface"] = physicalInterface }
+            if var proxy = item["proxySettings"] as? [String: Any], let tag = proxy["tag"] as? String { proxy["tag"] = mapped[tag]; item["proxySettings"] = proxy }
+            stream["sockopt"] = sockopt; item["streamSettings"] = stream
+            var settings = item["settings"] as? [String: Any] ?? [:]
+            if let host = settings["address"] as? String, let ip = resolvedHosts[host] {
+                settings["address"] = ip
+                let key = stream["security"] as? String == "reality" ? "realitySettings" : "tlsSettings"
+                var tls = stream[key] as? [String: Any] ?? [:]
+                if (tls["serverName"] as? String ?? "").isEmpty { tls["serverName"] = host }
+                stream[key] = tls; item["streamSettings"] = stream
+            }
+            if let peers = settings["peers"] as? [[String: Any]] {
+                settings["peers"] = peers.map { original -> [String: Any] in
+                    var peer = original
+                    if let endpoint = peer["endpoint"] as? String, let c = URLComponents(string: "udp://" + endpoint),
+                       let host = c.host?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")), let ip = resolvedHosts[host], let port = c.port {
+                        peer["endpoint"] = (ip.contains(":") ? "[\(ip)]" : ip) + ":\(port)"
+                    }
+                    return peer
+                }
+            }
+            item["settings"] = settings
+            return item
         }
     }
 
@@ -63,6 +153,13 @@ public struct XrayConfiguration {
 
     public func probeData(port: UInt16, physicalInterface: String? = nil) throws -> Data {
         try data(physicalInterface: physicalInterface, probePort: port)
+    }
+    public func selectedProbeData(port: UInt16, selected: String?, physicalInterface: String = "") throws -> Data {
+        let result: [String: Any] = ["log": ["loglevel": "warning", "access": "none"],
+            "inbounds": [["tag": "td-probe", "listen": "127.0.0.1", "port": Int(port), "protocol": "socks", "settings": ["auth": "noauth"]]],
+            "outbounds": try routedOutbounds(selected: selected, physicalInterface: physicalInterface, resolvedHosts: [:]),
+            "routing": ["rules": [["type": "field", "inboundTag": ["td-probe"], "outboundTag": "td-vpn"]]]]
+        return try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
     }
 
     public func proxyData(port: UInt16, physicalInterface: String, resolvedHosts: [String: String]) throws -> Data {

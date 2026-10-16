@@ -148,3 +148,67 @@
 +	}
 +	t.Fatal("building the experimental profile must not remove stock Safari ALPN")
 +}
+
+--- a/app/dns/fakedns/fake.go
++++ b/app/dns/fakedns/fake.go
+@@ -21,0 +22 @@
++	tunnelDeckCache *tunnelDeckFakeStore
+@@ -51,0 +53 @@
++	if fkdns.tunnelDeckCache != nil { fkdns.tunnelDeckCache.file.Close() }
+@@ -73 +75 @@
+-	return &Holder{nil, nil, nil, conf}, nil
++	return &Holder{config: conf}, nil
+@@ -96 +98 @@
+-	return nil
++	return fkdns.loadTunnelDeckCache(lruSize)
+@@ -102,0 +105,4 @@
++	if fkdns.tunnelDeckCache != nil {
++		if ip, ok := fkdns.tunnelDeckCache.domains[domain]; ok { if fkdns.tunnelDeckCache.touch(domain) != nil { return nil }; return []net.Address{ip} }
++		if fkdns.pruneTunnelDeckCache() != nil || len(fkdns.tunnelDeckCache.domains) >= fkdns.tunnelDeckCache.limit { return nil }
++	}
+@@ -119 +125,4 @@
+-		if _, ok := fkdns.domainToIP.PeekKeyFromValue(ip); !ok {
++		_, inCache := fkdns.domainToIP.PeekKeyFromValue(ip)
++		persisted := false
++		if fkdns.tunnelDeckCache != nil { _, persisted = fkdns.tunnelDeckCache.ips[ip.String()] }
++		if !inCache && !persisted {
+@@ -126,0 +136,3 @@
++	}
++	if fkdns.tunnelDeckCache != nil {
++		if err := fkdns.tunnelDeckCache.put(domain, ip); err != nil { return nil }
+@@ -135,0 +148,5 @@
++	}
++	fkdns.mu.Lock()
++	defer fkdns.mu.Unlock()
++	if fkdns.tunnelDeckCache != nil {
++		if domain, ok := fkdns.tunnelDeckCache.ips[ip.String()]; ok { if fkdns.tunnelDeckCache.touch(domain) != nil { return "" }; return domain }
+--- a/proxy/dns/dns.go
++++ b/proxy/dns/dns.go
+@@ -212 +212,2 @@
+-					go h.handleIPQuery(id, qType, domain, writer, timer)
++					allowFake := session.InboundFromContext(ctx) == nil || session.InboundFromContext(ctx).Tag != "td-dns-real"
++				go h.handleIPQuery(id, qType, domain, writer, timer, allowFake)
+@@ -262 +263 @@
+-func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string, writer dns_proto.MessageWriter, timer *signal.ActivityTimer) {
++func (h *Handler) handleIPQuery(id uint16, qType dnsmessage.Type, domain string, writer dns_proto.MessageWriter, timer *signal.ActivityTimer, allowFake bool) {
+@@ -268,0 +270,11 @@
++	if allowFake && h.fdns != nil {
++        var fake []net.Address
++        if engine, ok := h.fdns.(dns.FakeDNSEngineRev0); ok {
++            fake = engine.GetFakeIPForDomain3(domain, qType == dnsmessage.TypeA, qType == dnsmessage.TypeAAAA)
++        } else { fake = h.fdns.GetFakeIPForDomain(domain) }
++        for _, ip := range fake {
++            if (qType == dnsmessage.TypeA && ip.Family().IsIPv4()) || (qType == dnsmessage.TypeAAAA && ip.Family().IsIPv6()) { ips = append(ips, ip.IP()) }
++        }
++        ttl4, ttl6 = 1, 1
++        if len(ips) == 0 { err = dns.ErrEmptyResponse }
++    } else {
+@@ -274 +286 @@
+-			FakeEnable: true,
++			FakeEnable: false,
+@@ -280 +292 @@
+-			FakeEnable: true,
++			FakeEnable: false,
+@@ -281,0 +294,2 @@
++	}
++

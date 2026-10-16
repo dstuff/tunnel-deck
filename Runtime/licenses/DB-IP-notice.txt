@@ -1,0 +1,12 @@
+IP Geolocation by DB-IP — https://db-ip.com
+
+TunnelDeck includes a transformed copy of DB-IP IP to Country Lite, October 2026.
+Source: https://download.db-ip.com/free/dbip-country-lite-2026-10.csv.gz
+Source SHA-256: 097426b8ddae89157d444a59ac1847e873f7943c32d52becc4371c8b0273af80
+License: Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+
+Changes: address ranges converted to CIDR entries in Xray's GeoIP protobuf and
+to a sorted binary range index for local address explanations. Country data is
+approximate. No endorsement by DB-IP is implied.
+Reproduction script: script/prepare_geoip.py

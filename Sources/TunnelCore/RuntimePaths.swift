@@ -7,6 +7,14 @@ public struct RuntimePaths: Sendable {
     public var socksTunnel: String { root.appendingPathComponent("bin/hev-socks5-tunnel").path }
     public var amnezia: String { root.appendingPathComponent("bin/amneziawg-go").path }
     public var awg: String { root.appendingPathComponent("bin/awg").path }
+    public var geoIP: URL { root.appendingPathComponent("geoip") }
+    public func checkRouting() throws {
+        guard FileManager.default.isExecutableFile(atPath: xray), FileManager.default.isExecutableFile(atPath: socksTunnel),
+              FileManager.default.fileExists(atPath: geoIP.appendingPathComponent("geoip.dat").path),
+              FileManager.default.fileExists(atPath: geoIP.appendingPathComponent("countries.bin").path) else {
+            throw VPNError("В сборке отсутствует общий маршрутизатор или база стран. Переустановите TunnelDeck.")
+        }
+    }
     public var openconnect: String? {
         let path = root.appendingPathComponent("bin/openconnect").path
         return FileManager.default.isExecutableFile(atPath: path) ? path : nil

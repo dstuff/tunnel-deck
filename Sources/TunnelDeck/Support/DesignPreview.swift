@@ -21,7 +21,11 @@ extension AppModel {
                         VPNProfile(name: "Резервный", kind: .amneziaWG)]
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("TunnelDeck-Design-\(UUID().uuidString)")
         let store = ProfileStore(file: directory.appendingPathComponent("profiles.json"))
-        do { try store.save(.init(profiles: profiles, selectedProfile: profiles[0].id)) }
+        var routing = RoutingPolicy()
+        routing.rules = [RoutingRule(match: .init(type: .domainSuffix, value: "ads.example.net"), action: .block),
+                         RoutingRule(match: .init(type: .domainSuffix, value: "example.org"), action: .vpn),
+                         RoutingRule(match: .init(type: .country, value: "RU"), action: .direct)]
+        do { try store.save(.init(profiles: profiles, selectedProfile: profiles[0].id, routing: routing)) }
         catch { preconditionFailure("Cannot initialize isolated design preview") }
         let model = AppModel(profileStore: store, arguments: [])
         model.connection.prepareDesignPreview(profile: profiles[0].id)

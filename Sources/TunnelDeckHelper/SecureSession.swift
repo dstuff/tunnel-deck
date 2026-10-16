@@ -32,6 +32,7 @@ final class SecureSession {
         guard data.count <= 512_000, let decoded = try? JSONDecoder().decode(TunnelRequest.self, from: data),
               decoded.userID == userID, decoded.parentPID > 1 else { throw VPNError("Некорректный запрос подключения.") }
         request = decoded; redactor = LogRedactor(request: decoded)
+        _ = try decoded.routing.validated()
         events = try verified("events.jsonl", flags: O_WRONLY | O_APPEND, type: S_IFREG)
         do { control = try verified("control", flags: O_RDWR | O_NONBLOCK, type: S_IFIFO) }
         catch { close(events); throw error }
@@ -48,6 +49,9 @@ final class SecureSession {
     }
     func emit(_ kind: TunnelEvent.Kind, _ message: String) {
         try? journal.append(TunnelEvent(kind, redactor.redact(message)))
+    }
+    func routingReady(_ info: RoutingRuntimeInfo) {
+        try? journal.append(TunnelEvent(.routingReady, "Общая маршрутизация готова.", routing: info))
     }
     func stopping() -> Bool {
         var buffer = [UInt8](repeating: 0, count: 128)

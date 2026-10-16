@@ -12,6 +12,18 @@ struct ContentView: View {
             SessionSummaryView(model: model)
                 .padding(.horizontal, 28).padding(.vertical, 16)
             Divider()
+            Button { present("routing") } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(.secondary)
+                    Text("Маршрутизация")
+                    Text(model.routing.name).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer(minLength: 12)
+                    if model.routingPending { Text("Есть изменения").font(.caption).foregroundStyle(.orange) }
+                    Text("Настроить").foregroundStyle(.blue)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                }.contentShape(Rectangle()).padding(.horizontal, 28).padding(.vertical, 13)
+            }.buttonStyle(.plain).help("Общие правила для всех подключений")
+            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Подключения")
@@ -57,6 +69,7 @@ struct ContentView: View {
         .frame(minWidth: 720, minHeight: 480)
         .tint(.blue)
         .navigationTitle("TunnelDeck")
+        .onAppear { if CommandLine.arguments.contains("--routing-preview") { present("routing") } }
         .alert("Удалить подключение?", isPresented: Binding(
             get: { profileToDelete != nil },
             set: { if !$0 { profileToDelete = nil } }

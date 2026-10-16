@@ -5,8 +5,11 @@ import TunnelCore
 
 final class NetworkConfiguration {
     let physicalInterface: String
+    let physicalDNS: [String]
     private let gateway4: String?
     private let gateway6: String?
+    private let physicalRouteVia4: [String]?
+    private let physicalRouteVia6: [String]?
     private var routes: [[String]] = []
     private var dnsStore: SCDynamicStore?
     private let dnsKey = "State:/Network/Service/TunnelDeck-" + UUID().uuidString + "/DNS"
@@ -28,6 +31,17 @@ final class NetworkConfiguration {
         }
         physicalInterface = iface
         gateway4 = value("gateway", in: v4); gateway6 = value("gateway", in: v6)
+        func physicalRouteVia(_ snapshot: String) -> [String]? {
+            guard value("interface", in: snapshot) == iface, let gateway = value("gateway", in: snapshot) else { return nil }
+            return gateway.hasPrefix("link#") ? ["-interface", iface] : [gateway]
+        }
+        physicalRouteVia4 = physicalRouteVia(v4)
+        physicalRouteVia6 = physicalRouteVia(v6)
+        let store = SCDynamicStoreCreate(nil, "TunnelDeckBaseline" as CFString, nil, nil)
+        let global = store.flatMap { SCDynamicStoreCopyValue($0, "State:/Network/Global/IPv4" as CFString) as? [String: Any] }
+        let service = global?["PrimaryService"] as? String
+        let dns = service.flatMap { service in store.flatMap { SCDynamicStoreCopyValue($0, "State:/Network/Service/\(service)/DNS" as CFString) as? [String: Any] } }
+        physicalDNS = (dns?["ServerAddresses"] as? [String] ?? []).filter { IPNetwork.address($0) != nil }
     }
 
     func protectEndpoints(_ hosts: [String]) throws {
@@ -51,7 +65,10 @@ final class NetworkConfiguration {
         }
     }
 
-    func configure(interface: String, addresses: [String], mtu: Int, allowedIPs: [String], dns: [String]) throws {
+    func configure(interface: String, addresses: [String], mtu: Int, allowedIPs: [String], dns: [String], scoped: Bool = false) throws {
+        guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil,
+              (576...9000).contains(mtu), addresses.allSatisfy({ AmneziaConfiguration.validCIDR($0) }),
+              allowedIPs.allSatisfy({ AmneziaConfiguration.validCIDR($0) }), dns.allSatisfy({ IPNetwork.address($0) != nil }) else { throw VPNError("Некорректная конфигурация сети.") }
         for address in addresses {
             let args = address.contains(":") ? [interface, "inet6", address, "alias"] :
                 [interface, "inet", address, String(address.split(separator: "/")[0]), "alias"]
@@ -66,10 +83,18 @@ final class NetworkConfiguration {
             session.emit(.log, "Для IPv6-маршрутов настроен локальный адрес туннеля.")
         }
         for cidr in Set(allowedIPs) {
-            let prefixes = cidr == "0.0.0.0/0" ? ["0.0.0.0/1", "128.0.0.0/1"] :
-                cidr == "::/0" ? ["::/1", "8000::/1"] : [cidr]
+            let prefixes = !scoped && cidr == "0.0.0.0/0" ? ["0.0.0.0/1", "128.0.0.0/1"] :
+                !scoped && cidr == "::/0" ? ["::/1", "8000::/1"] : [cidr]
             for prefix in prefixes {
-                try addRoute([prefix.contains(":") ? "-inet6" : "-inet", "-net", prefix, "-interface", interface])
+                // IP_BOUND_IF cannot use the unscoped physical default once a more
+                // specific capture route points at the TUN. Mirror that prefix in
+                // the physical scope so direct/server sockets retain their exit.
+                if !scoped, let via = prefix.contains(":") ? physicalRouteVia6 : physicalRouteVia4 {
+                    try addRoute([prefix.contains(":") ? "-inet6" : "-inet", "-ifscope", physicalInterface,
+                                  "-net", prefix] + via, tolerateExisting: true)
+                }
+                let scope = scoped ? ["-ifscope", interface] : []
+                try addRoute([prefix.contains(":") ? "-inet6" : "-inet"] + scope + ["-net", prefix, "-interface", interface], tolerateExisting: scoped)
             }
         }
         if !dns.isEmpty {
@@ -79,6 +104,18 @@ final class NetworkConfiguration {
             guard SCDynamicStoreAddTemporaryValue(store, dnsKey as CFString, values as CFDictionary) else { throw VPNError("macOS отклонила настройку DNS.") }
             dnsStore = store
         }
+    }
+
+    func excludeFromVPN(_ cidrs: [String], interface: String) throws {
+        for cidr in cidrs {
+            let network = try IPNetwork(cidr)
+            try addRoute([network.bytes.count == 16 ? "-inet6" : "-inet", "-ifscope", interface, "-net", network.cidr, "-interface", interface, "-reject"])
+        }
+    }
+
+    func flushDNSCache() {
+        _ = try? tool("/usr/bin/dscacheutil", ["-flushcache"], allowFailure: true)
+        _ = try? tool("/usr/bin/killall", ["-HUP", "mDNSResponder"], allowFailure: true)
     }
 
     private func addRoute(_ args: [String], tolerateExisting: Bool = false) throws {
@@ -104,6 +141,7 @@ final class NetworkConfiguration {
         dnsStore = nil
         for args in routes.reversed() { _ = try? tool("/sbin/route", ["-q", "-n", "delete"] + args, allowFailure: true) }
         routes.removeAll()
+        flushDNSCache()
     }
     deinit { restore() }
 }

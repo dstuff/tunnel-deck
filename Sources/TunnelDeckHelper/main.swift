@@ -3,6 +3,10 @@ import Darwin
 import TunnelCore
 
 let args = CommandLine.arguments
+if args.count == 3, args[1] == "--openconnect-network" {
+    do { try writeOpenConnectNetworkEvent(directory: args[2]); exit(0) }
+    catch { fputs("OpenConnect: некорректное сетевое событие.\n", stderr); exit(1) }
+}
 guard args.count == 5, args[1] == "--session", args[3] == "--uid", let uid = UInt32(args[4]) else {
     fputs("TunnelDeckHelper --session <private-directory> --uid <uid>\n", stderr)
     exit(2)

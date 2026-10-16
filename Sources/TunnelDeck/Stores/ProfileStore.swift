@@ -13,28 +13,32 @@ struct ProfileStore: ProfileStorage {
         var profiles: [VPNProfile] = []
         var selectedProfile: UUID?
         var secrets: [String: ProfileSecrets] = [:]
+        var routing: RoutingPolicy = .init()
 
         init(profiles: [VPNProfile] = [], selectedProfile: UUID? = nil,
-             secrets: [String: ProfileSecrets] = [:]) {
-            version = 2
+             secrets: [String: ProfileSecrets] = [:], routing: RoutingPolicy = .init()) {
+            version = 3
             self.profiles = profiles
             self.selectedProfile = selectedProfile
             self.secrets = secrets
+            self.routing = routing
         }
 
-        private enum CodingKeys: String, CodingKey { case version, profiles, selectedProfile, secrets }
+        private enum CodingKeys: String, CodingKey { case version, profiles, selectedProfile, secrets, routing }
 
         init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             let storedVersion = try values.decodeIfPresent(Int.self, forKey: .version) ?? 1
-            guard storedVersion == 1 || storedVersion == 2 else {
+            guard (1...3).contains(storedVersion) else {
                 throw VPNError("Версия локального файла профилей не поддерживается. Обновите приложение или восстановите совместимый файл и перезапустите TunnelDeck.")
             }
-            version = 2
+            version = 3
             profiles = try values.decode([VPNProfile].self, forKey: .profiles)
             selectedProfile = try values.decodeIfPresent(UUID.self, forKey: .selectedProfile)
             // Earlier files contain metadata only. Never read their secrets from Keychain.
-            secrets = storedVersion == 2 ? try values.decode([String: ProfileSecrets].self, forKey: .secrets) : [:]
+            secrets = storedVersion >= 2 ? try values.decode([String: ProfileSecrets].self, forKey: .secrets) : [:]
+            routing = storedVersion >= 3 ? try values.decode(RoutingPolicy.self, forKey: .routing) : .init()
+            guard routing.format == "tunneldeck-routing", routing.version == 1 else { throw VPNError("Версия локальной схемы маршрутизации не поддерживается.") }
         }
     }
 

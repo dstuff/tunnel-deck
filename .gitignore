@@ -5,6 +5,7 @@ dist/
 Runtime/bin/
 Runtime/openconnect/
 Runtime/xray/
+Runtime/geoip/
 *.log
 .DS_Store
 .private/

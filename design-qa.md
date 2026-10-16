@@ -1,107 +1,113 @@
-# TunnelDeck — compact connection list
+# TunnelDeck — общая маршрутизация
 
 final result: passed
 
-Selected visual: option 1, `Design/ConnectionList/reference.png` (1377 × 1142).
-Implementation: `Design/ConnectionList/implementation-connected-final.png` (1560 × 1260).
-Native window: 780 × 630 points, Retina scale 2. Source normalized to width
-780 points while retaining its aspect ratio (780 × 647); implementation normalized
-to 780 × 630. No stretching. This is a macOS application, so CSS size does not apply.
-State: dark, three synthetic profiles, first profile connected in isolated DEBUG
-preview. Preview status is simulated and is not evidence of VPN connectivity.
+Source visual truth: `Design/Routing/reference.png`, выбранный пользователем
+вариант 2 — список правил слева, редактор справа. Source: 1513 × 1039 px.
+Implementation: `Design/Routing/implementation-final.png`, 1920 × 1344 px.
+Окно SwiftUI: 960 × 672 points, Retina density 2. CSS viewport не применяется.
+Для сравнения оба изображения приведены к ширине 960 px с сохранением пропорций:
+source 960 × 659, implementation 960 × 672. Растяжения нет; разница высоты
+13 points включает нативное оформление окна. Состояние: тёмная тема, три
+синтетических правила, выбрана Россия, есть неприменённые изменения.
 
-## Comparison history
+## Findings и история исправлений
 
-Initial evidence: `Design/ConnectionList/comparison-initial.png` and
-`Design/ConnectionList/comparison-focus-initial.png`, source left / application
-right in each shared comparison image. The focused image includes the title bar,
-status and profile rows, with legible text and controls.
+1. [P1, исправлено] Первый редактор растягивал всю композицию и обрезал шапку
+   и постоянную панель применения. Evidence: `comparison-initial.png` вместе с
+   `implementation-initial.png`. Исправление: ограниченный GeometryReader /
+   ScrollView для редактора, самостоятельный footer. Текущий снимок показывает
+   заголовок, toolbar, удаление правила и обе нижние кнопки полностью.
+2. [P2, исправлено] После первого исправления колонки имели разные пропорции,
+   нижние элементы редактора требовали лишней прокрутки. Evidence:
+   `comparison-scroll-pass.png`. Исправление: равные колонки HStack, компактные
+   интервалы редактора и стандартный размер контролов. Итоговое сравнение
+   `comparison-final.png` показывает обе колонки целиком в той же ширине окна.
+3. [P2, исправлено] Шапка и строки были выше выбранного макета, меняя плотность
+   списка. Уменьшены верхние отступы, промежутки шапки и вертикальные отступы
+   строк; исправления видны в итоговом полном сравнении. Список — нативный List
+   с выбором стрелками; первоначальное выделение поля названия устранено.
+4. [P2, исправлено] Оранжевый текст статуса был недостаточно контрастен на белом.
+   В светлой теме используется тёмный янтарный цвет, около 6.4:1 на белом;
+   в тёмной сохранён системный orange. Evidence: `implementation-light.png`.
 
-- P2: Status section and rows are taller than the selected mock. Reduce status
-  vertical padding/minimum height and row padding; align the profile name column.
-- P2: Native toolbar initially collapsed Add Connection to an icon; native
-  background-window buttons also reduced action prominence. Keep the full text
-  label and explicit blue primary / outlined secondary styles.
-- P2: Verify that auxiliary windows open and come to the front from row actions;
-  use explicit app activation and provide a keyboard path for profile settings.
+После последнего исправления повторно открыты совместные source/implementation
+сравнения `Design/Routing/comparison-final.png`, `comparison-inspector.png` и
+`comparison-footer.png`. В каждом source слева, implementation справа.
+Focused crops проверяют текст полей, переключатель, кнопку удаления, статус
+сохранения и кнопку переподключения; одного общего снимка для этого недостаточно.
+Открытых P0/P1/P2 по проверенным экранам нет.
 
-Second comparison: `Design/ConnectionList/comparison-final.png` and
-`Design/ConnectionList/comparison-focus-final.png`, again source left / application
-right. Status padding and row height are reduced; the name column aligns with
-the source; primary actions stay blue, secondary actions have explicit outlines,
-and the Add button retains its label. Native row actions now activate the app
-before presenting an auxiliary window. Add, profile settings and diagnostics were
-opened and inspected after the rebuild. No actionable P0/P1/P2 findings remain.
+## Пять поверхностей визуального соответствия
 
-## Required fidelity surfaces
+- Typography: системный SF UI, заголовок схемы 25 pt semibold, заголовки разделов
+  title3 semibold, основной интерфейс 13 pt и системные callout/caption.
+  Иерархия, переносы справочного текста и читаемость проверены на focused crops.
+  Шрифт и оптическое сглаживание принадлежат macOS; изображения текста не используются.
+- Spacing/layout: общая схема сверху, две равные колонки, постоянная нижняя
+  панель. Список и редактор прокручиваются независимо при большом содержимом.
+  В стандартном окне все действия доступны без прокрутки. Нативное окно чуть
+  выше концепта; смысловые области и их порядок сохранены. Минимальный размер
+  задан 850 × 620 points; ручная проверка изменения размера не проводилась.
+- Colors/tokens: системные адаптивные поверхности вместо декоративного градиента,
+  blue для выбора и главного действия, red для удаления, текстовый статус
+  дополнен пиктограммой. Светлая тема проверена отдельно. Насыщенный фон выбора
+  строки и нативные формы контролов — ожидаемое поведение macOS.
+- Image/assets: иллюстраций, логотипов и декоративных растров в исходном экране
+  нет. Используются системные SF Symbols и нативное оформление окна; bitmap
+  макет не встроен в интерфейс. Растровых заглушек или самодельной замены логотипов нет.
+- Copy/content: сохранены «Мои правила», «Для всех подключений», «Остальной
+  интернет», три типа условия и три действия. Справка о первом совпадении
+  вынесена над списком без повтора в редакторе. URL относится ко всему сайту;
+  объяснение показывается при вводе URL. Формат файла содержит только правила.
 
-- Typography: system SF UI with a 16-point semibold profile name and 19-point
-  semibold status; readable native callout/caption supporting text. The focused
-  comparison checks text weights, alignment and single-line action labels.
-  `Design/ConnectionList/long-name.png` confirms that long names truncate rather
-  than resize or wrap action buttons. System font fallback and optical rendering
-  remain platform-owned; there are no downloaded fonts or rasterized labels.
-- Spacing: revised status and row spacing follows the source hierarchy. At the
-  same normalized width, the application is 17 points shorter overall; this is an
-  accepted initial window-size difference, with persistent footer controls and a
-  scrolling profile area. No clipped controls or nested cards.
-- Colors: semantic system-adaptive surfaces, green connected status and blue
-  actions. Normal use follows the system theme; the comparison preview is dark.
-  The source's decorative gradient is replaced by the native flat window surface.
-  The active row has a restrained blue fill and hairline border. Status also has
-  a text label, and primary/secondary actions remain distinguishable by shape.
-- Assets: existing SF Symbols are used; the mock contains no raster illustrations.
-  Platform window chrome and its screen-sharing indicator are supplied by macOS.
-- Copy: profile names match the source in preview. The application displays Xray
-  rather than claiming a specific outbound subtype from protocol metadata alone.
-  Timer is live; its exact value differs from the mock.
+## Проверенные действия и состояния
 
-The full-view and focused comparisons were opened together for review. A focused
-crop is included because typography, the toolbar label, row alignment and action
-affordances require closer inspection than a full-window image alone.
+Все действия выполнялись в отдельном `local.TunnelDeck.Preview`, с временным
+хранилищем и имитацией VPN. Настоящий helper и рабочие профили не использовались.
 
-## Verification so far
+- Выбор правил мышью и стрелками; редактор меняет условие и действие.
+- Добавление; ввод URL с путём; переключение на IPv6-сеть и нормализация CIDR;
+  включение/выключение, перемещение через контекстное меню, удаление.
+- Ошибка пустого условия отключает экспорт, проверку адреса и применение.
+  Evidence: `invalid-rule.png`. Пустой список объясняет действие по умолчанию:
+  `empty-rules.png`. Эти дополнительные состояния сняты до финальной правки
+  плотности; текущий полный снимок подтверждает окончательные отступы.
+- Проверка ads.example.net объясняет блокировку первым правилом:
+  `address-check.png`. Это объяснение правил, не проверка передачи данных.
+- Экспорт системным NSSavePanel; импорт того же файла через NSOpenPanel;
+  предпросмотр трёх правил и явная замена: `import-preview.png`. Файл проверен
+  на публичную схему, без полей сервера и секретов. Импорт не подключает VPN.
+- «Применить и переподключить» в имитации устанавливает активный снимок, показывает
+  «Правила применены» и отключается: `applied-preview.png`.
+- Светлая тема: `implementation-light.png`; тёмная: `implementation-final.png`.
+- Browser console не применяется к нативному SwiftUI-приложению.
 
-- Current unit suite: 39 tests passed, including 12 persistence tests,
-  leading-comment AWG import and failed import rollback. DEBUG application
-  packaging/signature verification and normal launch passed. A separate release
-  build passed during the earlier UI verification, before the storage migration.
-  Username and password fields from a previous OpenConnect step are ignored for
-  other protocols.
-- Native add flow: Command-N, rejection of an incomplete VLESS link, recognition
-  of an example OpenConnect address, credential fields and cancellation without
-  saving into the real profile store.
-- Isolated preview: switching changes the active row and status; deleting the
-  active profile is disabled. Full JSON import completed with a long test name;
-  the new row appeared without connecting automatically.
-  Disconnect returned all rows to Connect. Profile settings opened from the row
-  menu and through Command-I, displayed the correct profile and closed with Done.
-  Diagnostics opened from the footer in a separate native window.
-- Additional native evidence: `Design/ConnectionList/profile-editor.png` and
-  `Design/ConnectionList/long-name.png`. Light/system theme was also inspected in
-  the normal app and in the auxiliary form. These images were captured during
-  the earlier UI pass, before removal of the Keychain persistence toggle.
-- Local storage follow-up, 16 October 2026: the settings, profile editor and
-  import confirmation were inspected after replacing Keychain with one local
-  profile file. Their copy now describes automatic local persistence; there is
-  no secrets-persistence toggle. Tests restore every protocol's fields from disk
-  and cover legacy formats, file permissions and read/write failures. The preview
-  uses a separate temporary file and the normal app starts without connecting.
-- Browser console checks do not apply: this is the native SwiftUI app, not a web
-  prototype. No browser-only replacement was built.
-- Real servers / handshake / routes were not exercised for this UI change.
+## Технические границы проверки
+
+64 Swift-теста прошли; debug/release сборки успешны. Локальные routing smoke
+с поставляемым Xray, в том числе из подписанного bundle, подтвердили TCP, UDP,
+IPv6, блокировку, страны, оба defaultAction, отдельную VPN-пробу, real-DNS и
+сохранение FakeDNS после рестарта. Go tests FakeDNS/DNS и офлайн TLS-профиля
+прошли; отдельный engine smoke проверил OpenConnect/AWG/Xray без удалённого VPN.
+Подпись итогового bundle и хеши runtime/source проверены.
+
+Эти результаты не подтверждают новый handshake или передачу данных через
+настоящие OpenConnect, AmneziaWG или Xray-серверы и системный utun. Для такого
+утверждения остаётся отдельная live-проверка с подключением, отключением и
+восстановлением сети; границы отражены в docs/PROTOCOLS.md.
 
 ## Follow-up polish
 
-- P3: macOS renders the ellipsis Menu as a native symbol rather than reproducing
-  the mock's circular artwork exactly. It retains its tooltip, accessibility
-  label and context-menu alternative. Existing protocol SF Symbols are preserved.
-- Native window chrome and the automation screen-sharing indicator differ from
-  the conceptual image; these are not app content or raster assets to recreate.
+- [P3] Нативные Picker/Menu и выделение List отличаются от концептуальных
+  прямоугольных контролов и приглушённого фона. Это принято как интеграция с
+  существующим macOS-приложением. Действия имеют accessibility labels и
+  контекстное меню; выбор доступен с клавиатуры.
 
 ## Implementation checklist
 
-- [x] Compare full view and focused regions after fixing initial findings.
-- [x] Verify all five fidelity surfaces and key native interactions.
-- [x] Verify local parsing, persistence and cancellation/cleanup coordination.
-- [x] Keep real VPN connectivity outside the claims of this design QA pass.
+- [x] Сопоставить source и итоговый native screenshot в одном изображении.
+- [x] Проверить focused crops, пять поверхностей и светлую тему.
+- [x] Проверить основные действия, ошибки, пустое состояние, импорт/экспорт.
+- [x] Сохранить все найденные P1/P2 и evidence после исправлений.
+- [x] Различить имитацию, локальный data-path тест и реальное VPN-соединение.

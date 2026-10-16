@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild TunnelDeck's opt-in REALITY compatibility profile from pinned Xray source.
+# Rebuild TunnelDeck's common router and REALITY compatibility core from pinned source.
 set -euo pipefail
 
 XRAY_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +22,8 @@ XRAY_BUILD_DIR="$(mktemp -d "$XRAY_ROOT_DIR/.runtime-sources/xray-compat-build.X
 tar -xzf "$XRAY_SOURCE_ARCHIVE" -C "$XRAY_BUILD_DIR" --strip-components=1
 cd "$XRAY_BUILD_DIR"
 patch -p1 -i "$XRAY_ROOT_DIR/script/xray_compat.patch"
+cp "$XRAY_ROOT_DIR/script/xray-routing/fake_persistence.go" app/dns/fakedns/tunneldeck_persistence.go
+cp "$XRAY_ROOT_DIR/script/xray-routing/fake_persistence_test.go" app/dns/fakedns/tunneldeck_persistence_test.go
 
 export GOCACHE="$XRAY_ROOT_DIR/.runtime-sources/go-cache"
 export GOMODCACHE="$XRAY_ROOT_DIR/.runtime-sources/go-mod"
@@ -29,8 +31,9 @@ export GOTOOLCHAIN=go1.26.0
 export CGO_ENABLED=0 GOOS=darwin GOARCH=arm64
 go mod download
 go test ./transport/internet/reality -run '^TestTunnelDeckSafari15' -count=1
+go test ./app/dns/fakedns ./proxy/dns -count=1
 go build -trimpath -buildvcs=false -gcflags=all=-l=4 \
-    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.2 -s -w -buildid=' \
+    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.3 -s -w -buildid=' \
     -o "$XRAY_BUILD_DIR/xray-tunneldeck" ./main
 install -m 755 "$XRAY_BUILD_DIR/xray-tunneldeck" "$XRAY_ROOT_DIR/Runtime/xray/xray"
 "$XRAY_ROOT_DIR/Runtime/xray/xray" version

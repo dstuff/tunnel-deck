@@ -8,6 +8,8 @@ import TunnelCore
     var selection: UUID?
     var draft = VPNProfile() { didSet { scheduleAutosave() } }
     var secrets = ProfileSecrets() { didSet { scheduleAutosave() } }
+    var routing = RoutingPolicy() { didSet { scheduleAutosave() } }
+    private(set) var savedRouting = RoutingPolicy()
     var notice: String?
     private(set) var persistenceError: String?
     let connection: ConnectionController
@@ -45,6 +47,8 @@ import TunnelCore
             persistenceError = error.localizedDescription
         }
         profiles = document.profiles
+        routing = document.routing
+        savedRouting = document.routing
         for profile in profiles {
             inMemorySecrets[profile.id] = document.secrets[profile.id.uuidString] ?? ProfileSecrets()
         }
@@ -114,10 +118,11 @@ import TunnelCore
         }
         do {
             try profileStore.save(.init(profiles: updatedProfiles, selectedProfile: selected,
-                                        secrets: storedSecrets))
+                                        secrets: storedSecrets, routing: routing))
             profiles = updatedProfiles
             inMemorySecrets = retainedSecrets
             persistenceError = nil
+            savedRouting = routing
             return true
         } catch {
             persistenceError = "Не удалось сохранить настройки: \(error.localizedDescription)"
@@ -206,7 +211,29 @@ import TunnelCore
 
     func connect() {
         guard !switcher.isSwitching else { return }
-        if save(showNotice: false) { connection.connect(profile: draft, secrets: secrets) }
+        if save(showNotice: false) { connection.connect(profile: draft, secrets: secrets, routing: routing) }
+    }
+
+    var routingError: String? {
+        do { _ = try routing.validated(); return nil } catch { return error.localizedDescription }
+    }
+    var routingPending: Bool {
+        guard let active = connection.activeRouting else { return false }
+        return (try? routing.validated()) != active
+    }
+    var canApplyRouting: Bool {
+        routingError == nil && persistenceError == nil && connection.state == .connected && !switcher.isSwitching && routingPending
+    }
+    func applyRouting() {
+        guard canApplyRouting, let active = connection.activeProfile, save(showNotice: false) else { return }
+        switcher.start(to: active) { [weak self] in self?.selectAndConnect(active) }
+    }
+    @discardableResult func replaceRouting(_ policy: RoutingPolicy) -> Bool {
+        guard loadError == nil else { return false }
+        let previous = routing
+        routing = policy
+        guard save(showNotice: false) else { routing = previous; return false }
+        return true
     }
 
     func check() {

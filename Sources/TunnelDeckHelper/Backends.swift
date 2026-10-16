@@ -15,6 +15,8 @@ final class BackendRunner {
     }
     func run() throws {
         try runtime.check(session.request.profile.kind)
+        try runtime.checkRouting()
+        _ = try session.request.routing.validated()
         switch session.request.profile.kind {
         case .openConnect: try openConnect()
         case .amneziaWG: try amnezia()
@@ -27,65 +29,79 @@ final class BackendRunner {
         let configuration = try OpenConnectConfiguration.make(profile: request.profile, secrets: request.secrets)
         let configURL = scratch.appendingPathComponent("openconnect.conf")
         try PrivateSession.write(Data(configuration.utf8), to: configURL)
-        let ready = scratch.appendingPathComponent("network-ready")
-        let script = scratch.appendingPathComponent("network.sh")
-        let body = """
-        #!/bin/sh
-        \(shellQuote(runtime.vpncScript!))
-        result=$?
-        if [ "$result" -eq 0 ]; then
-          case "$reason" in
-            connect|reconnect) /usr/bin/touch \(shellQuote(ready.path)) ;;
-            disconnect) /bin/rm -f \(shellQuote(ready.path)) ;;
-          esac
-        fi
-        exit "$result"
-        """
-        try PrivateSession.write(Data(body.utf8), to: script)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
-        let child = try EngineProcess(executable: runtime.openconnect!, arguments: ["--config", configURL.path, "--cookie-on-stdin", "--verbose", "--script", shellQuote(script.path), "--reconnect-timeout=30"], env: environment(runtime: runtime), input: request.cookie, session: session)
-        defer { child.stop() }
-        let start = Date(); var connected = false
+        let network = try NetworkConfiguration(session: session)
+        let endpoint = try VPNEndpoint(server: request.profile.server, camouflage: request.secrets.camouflage)
+        if let host = URLComponents(string: endpoint.baseURL)?.host { try network.protectEndpoints([host]) }
+        let helper = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path
+        let callback = shellQuote(helper) + " --openconnect-network " + shellQuote(scratch.path)
+        let child = try EngineProcess(executable: runtime.openconnect!, arguments: ["--config", configURL.path, "--cookie-on-stdin", "--verbose", "--script", callback, "--reconnect-timeout=30"], env: environment(runtime: runtime), input: request.cookie, session: session)
+        var router: RoutingRuntime?
+        defer { network.restore(); router?.stop(); child.stop() }
+        let eventFile = scratch.appendingPathComponent("openconnect-network.json")
+        var previous: UUID?, deadline = Date().addingTimeInterval(60)
         while !session.stopping() {
             guard child.process.isRunning else { throw VPNError("OpenConnect завершил соединение. Подробности в журнале.") }
-            let configured = FileManager.default.fileExists(atPath: ready.path)
-            if configured && !connected { connected = true; session.emit(.connected, "ocserv: авторизация пройдена, сеть настроена.") }
-            if !configured && connected { connected = false; session.emit(.configuring, "OpenConnect восстанавливает соединение…") }
-            if !connected && Date().timeIntervalSince(start) > 60 { throw VPNError("Сервер не завершил настройку туннеля за 60 секунд.") }
+            if let data = try? Data(contentsOf: eventFile), data.count <= 64_000,
+               let event = try? JSONDecoder().decode(OpenConnectNetworkSettings.self, from: data), event.id != previous {
+                previous = event.id
+                switch event.reason {
+                case "connect", "reconnect":
+                    // The same baseline is retained across reconnects; no server script can install global routes.
+                    network.restore(); router?.stop(); router = nil
+                    if let gateway = event.gateway { try network.protectEndpoints([gateway]) }
+                    try network.configure(interface: event.interface, addresses: event.addresses, mtu: event.mtu,
+                                          allowedIPs: event.routes, dns: [], scoped: true)
+                    try network.excludeFromVPN(event.excludedRoutes, interface: event.interface)
+                    router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
+                                                vpnInterface: event.interface, vpnDNS: event.dns, vpnAddresses: event.addresses)
+                    session.emit(.connected, "ocserv: авторизация пройдена, общая маршрутизация настроена.")
+                    deadline = .distantFuture
+                case "attempt-reconnect":
+                    session.emit(.configuring, "OpenConnect восстанавливает VPN-канал; правила остаются включены…")
+                    deadline = Date().addingTimeInterval(60)
+                case "disconnect": throw VPNError("OpenConnect закрыл VPN-канал.")
+                default: break
+                }
+            }
+            try router?.checkRunning()
+            if Date() > deadline { throw VPNError("Сервер не завершил настройку туннеля за 60 секунд.") }
             usleep(250_000)
         }
     }
     func amnezia() throws {
         let config = try AmneziaConfiguration(session.request.secrets.configuration)
         let network = try NetworkConfiguration(session: session)
-        defer { network.restore() }
         let nameFile = scratch.appendingPathComponent("interface")
         let configFile = scratch.appendingPathComponent("awg.conf")
         try PrivateSession.write(Data(config.deviceConfiguration.utf8), to: configFile)
         var env = environment(runtime: runtime)
-        env["WG_TUN_NAME_FILE"] = nameFile.path
-        env["LOG_LEVEL"] = "error"
+        env["WG_TUN_NAME_FILE"] = nameFile.path; env["LOG_LEVEL"] = "error"
         let child = try EngineProcess(executable: runtime.amnezia, arguments: ["-f", "utun"], env: env, session: session)
-        defer { child.stop() }
+        var router: RoutingRuntime?
+        defer { network.restore(); router?.stop(); child.stop() }
         var interface = ""
         for _ in 0..<100 {
             if session.stopping() { return }
             if let text = try? String(contentsOf: nameFile, encoding: .utf8) {
                 interface = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if interface.range(of: #"^utun[0-9]+$"#, options: .regularExpression) != nil { break }
+                if interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil { break }
             }
             guard child.process.isRunning else { throw VPNError("Не удалось создать интерфейс AmneziaWG.") }
             usleep(100_000)
         }
-        guard interface.range(of: #"^utun[0-9]+$"#, options: .regularExpression) != nil else { throw VPNError("AmneziaWG не сообщил имя интерфейса.") }
+        guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil else { throw VPNError("AmneziaWG не сообщил имя интерфейса.") }
         try tool(runtime.awg, ["setconf", interface, configFile.path], env: env)
         try network.protectEndpoints(config.endpointHosts)
+        // AllowedIPs retains peer selection/coverage; Table never disables the shared policy.
         try network.configure(interface: interface, addresses: config.addresses, mtu: config.mtu,
-                              allowedIPs: config.routesEnabled ? config.allowedIPs : [], dns: config.dns)
-        session.emit(.networkReady, "AmneziaWG: сеть настроена, ожидаем handshake…")
+                              allowedIPs: config.allowedIPs, dns: [], scoped: true)
+        router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
+                                    vpnInterface: interface, vpnDNS: config.dns, vpnAddresses: config.addresses)
+        session.emit(.networkReady, "AmneziaWG: общая маршрутизация настроена, ожидаем handshake…")
         var connected = false; let start = Date(); var lastCheck = Date.distantPast
         while !session.stopping() {
             guard child.process.isRunning else { throw VPNError("Движок AmneziaWG остановился.") }
+            try router?.checkRunning()
             if Date().timeIntervalSince(lastCheck) > 2 {
                 lastCheck = Date()
                 let handshakes = try tool(runtime.awg, ["show", interface, "latest-handshakes"], env: env)
@@ -101,121 +117,27 @@ final class BackendRunner {
     }
     func xray() throws {
         let config = try XrayConfiguration(session.request.secrets.configuration)
-        if config.usesVisionCompatibilityTLS {
-            session.emit(.log, "REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.")
-        }
+        _ = try config.selectedOutboundTag(session.request.profile.xrayOutboundTag)
+        if config.usesVisionCompatibilityTLS { session.emit(.log, "REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.") }
         let network = try NetworkConfiguration(session: session)
-        var xrayChild: EngineProcess?
-        var tunnelChild: EngineProcess?
-        defer {
-            // Restore capture routes and DNS while both packet paths still exist.
-            network.restore()
-            tunnelChild?.stop()
-            xrayChild?.stop()
-        }
-        let candidates: [String] = (300...999).map { "utun\($0)" }
-        guard let interface = candidates.first(where: { name in name.withCString { if_nametoindex($0) } == 0 }) else { throw VPNError("Нет свободного TUN-интерфейса.") }
+        var router: RoutingRuntime?
+        defer { network.restore(); router?.stop() }
         var resolved: [String: String] = [:]
-        for host in config.endpointHosts where !AmneziaConfiguration.validIP(host) {
-            var hints = addrinfo(); hints.ai_family = AF_INET; hints.ai_socktype = SOCK_STREAM
+        let endpointHosts = try config.endpointHosts(selected: session.request.profile.xrayOutboundTag)
+        for host in endpointHosts where IPNetwork.address(host) == nil {
+            var hints = addrinfo(); hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM
             var result: UnsafeMutablePointer<addrinfo>?
             guard getaddrinfo(host, nil, &hints, &result) == 0, let entry = result else { throw VPNError("Не удалось определить адрес сервера Xray.") }
+            defer { freeaddrinfo(result) }
             var text = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            let status = getnameinfo(entry.pointee.ai_addr, entry.pointee.ai_addrlen, &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST)
-            freeaddrinfo(result)
-            guard status == 0 else { throw VPNError("Не удалось определить IP сервера Xray.") }
+            guard getnameinfo(entry.pointee.ai_addr, entry.pointee.ai_addrlen, &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0 else { throw VPNError("Не удалось определить IP сервера Xray.") }
             resolved[host] = String(cString: text)
         }
-        let file = scratch.appendingPathComponent("xray.json")
-        let socksPort = try LoopbackPort.available()
-        try PrivateSession.write(config.proxyData(port: socksPort, physicalInterface: network.physicalInterface,
-                                                 resolvedHosts: resolved), to: file)
-        let tunnelFile = scratch.appendingPathComponent("socks-tunnel.yml")
-        let tunnelConfig = try SocksTunnelConfiguration(interface: interface, socksPort: socksPort)
-        try PrivateSession.write(tunnelConfig.data, to: tunnelFile)
-        try network.protectEndpoints(config.endpointRouteAddresses(resolvedHosts: resolved))
-        let child = try EngineProcess(executable: runtime.xray, arguments: ["run", "-config", file.path],
-                                      env: environment(runtime: runtime), session: session)
-        xrayChild = child
-        func socksIsReady() -> Bool {
-            let fd = socket(AF_INET, SOCK_STREAM, 0)
-            guard fd >= 0 else { return false }
-            defer { close(fd) }
-            var address = sockaddr_in()
-            address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-            address.sin_family = sa_family_t(AF_INET)
-            address.sin_addr.s_addr = inet_addr("127.0.0.1")
-            address.sin_port = socksPort.bigEndian
-            return withUnsafePointer(to: &address) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0 }
-            }
-        }
-        var socksReady = false
-        for _ in 0..<100 {
-            if session.stopping() { return }
-            guard child.process.isRunning else { throw VPNError("Xray не смог запустить локальный прокси. Проверьте журнал.") }
-            if socksIsReady() { socksReady = true; break }
-            usleep(100_000)
-        }
-        guard socksReady else { throw VPNError("Xray не открыл локальный прокси за 10 секунд.") }
-        func probe(_ stage: String) {
-            session.emit(.log, "Xray: проверяем сервер \(stage)…")
-            do {
-                try tool("/usr/bin/curl", ["--disable", "--silent", "--show-error", "--fail", "--proxy",
-                    "socks5h://127.0.0.1:\(socksPort)", "--noproxy", "", "--connect-timeout", "3", "--max-time", "5",
-                    "--output", "/dev/null", "https://example.com/"])
-                session.emit(.log, "Xray: HTTPS \(stage) работает.")
-            } catch {
-                // Readiness is decided by the application's HTTPS check through TUN.
-                // One unstable transport probe must not abort a working packet path.
-                session.emit(.log, "Xray: контрольный SOCKS-запрос \(stage) не прошёл: " + error.localizedDescription)
-            }
-        }
-        probe("до установки маршрутов")
-        if session.stopping() { return }
-        let tunnel = try EngineProcess(executable: runtime.socksTunnel, arguments: [tunnelFile.path],
-                                       env: environment(runtime: runtime), session: session)
-        tunnelChild = tunnel
-        func tunnelIsReady() -> Bool {
-            var entries: UnsafeMutablePointer<ifaddrs>?
-            guard getifaddrs(&entries) == 0 else { return false }
-            defer { if let entries { freeifaddrs(entries) } }
-            var entry = entries
-            var ipv4 = false, ipv6 = false
-            while let current = entry {
-                let info = current.pointee
-                if String(cString: info.ifa_name) == interface, info.ifa_flags & UInt32(IFF_UP) != 0,
-                   let address = info.ifa_addr, address.pointee.sa_family == AF_INET || address.pointee.sa_family == AF_INET6 {
-                    var text = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    if getnameinfo(address, socklen_t(address.pointee.sa_len), &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0 {
-                        let ip = String(cString: text)
-                        ipv4 = ipv4 || ip == SocksTunnelConfiguration.ipv4Address
-                        ipv6 = ipv6 || ip == SocksTunnelConfiguration.ipv6Address
-                    }
-                }
-                entry = info.ifa_next
-            }
-            return ipv4 && ipv6
-        }
-        var tunnelReady = false
-        for _ in 0..<100 {
-            if session.stopping() { return }
-            guard child.process.isRunning else { throw VPNError("Движок Xray остановился.") }
-            guard tunnel.process.isRunning else { throw VPNError("TUN-мост не смог настроить интерфейс. Проверьте журнал.") }
-            if tunnelIsReady() { tunnelReady = true; break }
-            usleep(100_000)
-        }
-        guard tunnelReady else { throw VPNError("TUN-мост не настроил интерфейс за 10 секунд.") }
-        try network.configure(interface: interface, addresses: SocksTunnelConfiguration.addresses,
-                              mtu: SocksTunnelConfiguration.mtu, allowedIPs: ["0.0.0.0/0", "::/0"], dns: SocksTunnelConfiguration.dns)
-        if session.stopping() { return }
-        guard child.process.isRunning, tunnel.process.isRunning else { throw VPNError("Движок Xray или TUN-мост остановился.") }
-        session.emit(.networkReady, "Xray: маршруты настроены, проверяем передачу данных…")
-        while !session.stopping() {
-            guard child.process.isRunning else { throw VPNError("Движок Xray остановился.") }
-            guard tunnel.process.isRunning else { throw VPNError("TUN-мост остановился.") }
-            usleep(250_000)
-        }
+        try network.protectEndpoints(endpointHosts.map { resolved[$0] ?? $0 })
+        router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
+                                    xray: config, resolvedHosts: resolved)
+        session.emit(.networkReady, "Xray: общая маршрутизация настроена, проверяем передачу данных через VPN…")
+        while !session.stopping() { try router?.checkRunning(); usleep(250_000) }
     }
     deinit { try? FileManager.default.removeItem(at: scratch) }
 }

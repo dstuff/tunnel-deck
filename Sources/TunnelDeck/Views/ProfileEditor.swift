@@ -50,7 +50,13 @@ struct ProfileEditor: View {
                             .scrollContentBackground(.hidden)
                             .padding(6).background(.background, in: RoundedRectangle(cornerRadius: 6))
                             .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.6)))
-                        Text(model.draft.kind == .amneziaWG ? "Параметры AWG 3.1 сохраняются целиком, включая защиту заголовков и диапазоны таймеров." : "Исходящие подключения и правила Xray используются в системном TUN-режиме. Входящие из JSON заменяются туннелем приложения.")
+                        if model.draft.kind == .xray, let config = try? XrayConfiguration(model.secrets.configuration), config.outboundChoices.count > 1 {
+                            Picker("Основной сервер", selection: $model.draft.xrayOutboundTag) {
+                                Text("Выберите сервер").tag(nil as String?)
+                                ForEach(config.outboundChoices) { choice in Text(choice.title).tag(choice.tag as String?) }
+                            }
+                        }
+                        Text(model.draft.kind == .amneziaWG ? "Параметры AWG 3.1 сохраняются целиком. AllowedIPs определяет доступные через сервер сети; общие правила задаются в «Маршрутизации»." : "Исходный JSON сохраняется. При подключении routing, dns и входящие заменяются общей схемой TunnelDeck; выбранный сервер и его цепочка используются для действия «Через VPN».")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

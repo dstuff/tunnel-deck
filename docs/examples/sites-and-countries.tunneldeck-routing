@@ -1,0 +1,20 @@
+{
+  "format": "tunneldeck-routing",
+  "version": 1,
+  "name": "Пример: сайты и страны",
+  "defaultAction": "vpn",
+  "rules": [
+    {
+      "match": { "type": "domainSuffix", "value": "ads.example.net" },
+      "action": "block"
+    },
+    {
+      "match": { "type": "domainSuffix", "value": "example.org" },
+      "action": "direct"
+    },
+    {
+      "match": { "type": "country", "value": "RU" },
+      "action": "direct"
+    }
+  ]
+}

@@ -230,7 +230,7 @@ import TunnelCore
         model.secrets.configuration = "vless://synthetic-id@vpn.example:443"
         XCTAssertTrue(model.save())
         let document = try store.load()
-        XCTAssertEqual(document.version, 2)
+        XCTAssertEqual(document.version, 3)
         XCTAssertEqual(document.profiles, [first, second])
         let restarted = AppModel(profileStore: store, arguments: [])
         XCTAssertEqual(restarted.secrets.configuration, model.secrets.configuration)

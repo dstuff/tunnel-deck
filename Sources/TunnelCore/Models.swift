@@ -29,13 +29,15 @@ public struct VPNProfile: Codable, Identifiable, Equatable, Sendable {
     public var authGroup: String
     public var certificatePin: String
     public var disableDTLS: Bool
+    public var xrayOutboundTag: String?
 
     public init(id: UUID = UUID(), name: String = "Новое подключение", kind: VPNProtocol = .openConnect,
                 server: String = "", username: String = "", authGroup: String = "",
-                certificatePin: String = "", disableDTLS: Bool = false) {
+                certificatePin: String = "", disableDTLS: Bool = false, xrayOutboundTag: String? = nil) {
         self.id = id; self.name = name; self.kind = kind; self.server = server
         self.username = username; self.authGroup = authGroup
         self.certificatePin = certificatePin; self.disableDTLS = disableDTLS
+        self.xrayOutboundTag = xrayOutboundTag
     }
 }
 
@@ -54,19 +56,31 @@ public struct TunnelRequest: Codable, Sendable {
     public var profile: VPNProfile
     public var secrets: ProfileSecrets
     public var cookie: String
-    public init(userID: UInt32, parentPID: Int32, profile: VPNProfile, secrets: ProfileSecrets, cookie: String = "") {
+    public var routing: RoutingPolicy
+    public init(userID: UInt32, parentPID: Int32, profile: VPNProfile, secrets: ProfileSecrets, cookie: String = "", routing: RoutingPolicy = .init()) {
         self.userID = userID; self.parentPID = parentPID; self.profile = profile
         self.secrets = secrets; self.cookie = cookie
+        self.routing = routing
+    }
+    private enum CodingKeys: String, CodingKey { case userID, parentPID, profile, secrets, cookie, routing }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        userID = try c.decode(UInt32.self, forKey: .userID); parentPID = try c.decode(Int32.self, forKey: .parentPID)
+        profile = try c.decode(VPNProfile.self, forKey: .profile); secrets = try c.decode(ProfileSecrets.self, forKey: .secrets)
+        cookie = try c.decodeIfPresent(String.self, forKey: .cookie) ?? ""
+        routing = try c.decodeIfPresent(RoutingPolicy.self, forKey: .routing) ?? .init()
     }
 }
 
 public struct TunnelEvent: Codable, Sendable {
-    public enum Kind: String, Codable, Sendable { case log, configuring, networkReady, connected, error, stopped }
+    public enum Kind: String, Codable, Sendable { case log, configuring, routingReady, networkReady, connected, error, stopped }
     public var kind: Kind
     public var message: String
     public var timestamp: Date
-    public init(_ kind: Kind, _ message: String) {
+    public var routing: RoutingRuntimeInfo?
+    public init(_ kind: Kind, _ message: String, routing: RoutingRuntimeInfo? = nil) {
         self.kind = kind; self.message = message; self.timestamp = Date()
+        self.routing = routing
     }
 }
 

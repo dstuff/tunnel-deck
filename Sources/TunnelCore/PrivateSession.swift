@@ -37,7 +37,11 @@ public final class PrivateSession {
             throw VPNError("Не удалось записать временную конфигурацию.")
         }
     }
-    public func save(_ request: TunnelRequest) throws { try Self.write(JSONEncoder().encode(request), to: requestFile) }
+    public func save(_ request: TunnelRequest) throws {
+        let data = try JSONEncoder().encode(request)
+        guard data.count <= 512_000 else { throw VPNError("Профиль вместе с маршрутизацией превышает допустимый размер запроса (512 КБ). Сократите конфигурацию или число правил.") }
+        try Self.write(data, to: requestFile)
+    }
     public func stop() { if controlFD >= 0 { _ = "stop\n".withCString { Darwin.write(controlFD, $0, 5) } } }
     public func remove() { try? FileManager.default.removeItem(at: directory) }
 

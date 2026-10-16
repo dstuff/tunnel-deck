@@ -28,6 +28,13 @@ import TunnelCore
             LogView(connection: model.connection).frame(minWidth: 600, minHeight: 300)
         }
         .defaultSize(width: 780, height: 460)
+        Window("Маршрутизация", id: "routing") {
+            RoutingView(model: model)
+                .tint(.blue)
+                .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? (CommandLine.arguments.contains("--light-preview") ? .light : .dark) : nil)
+        }
+        .defaultSize(width: 960, height: 660)
+        .windowResizability(.contentMinSize)
         Settings { SettingsView(connection: model.connection) }
         MenuBarExtra {
             MenuBarActions(model: model)

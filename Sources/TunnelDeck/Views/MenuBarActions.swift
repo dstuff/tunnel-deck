@@ -34,6 +34,10 @@ struct MenuBarActions: View {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "add-connection")
         }.disabled(!model.canManageProfiles)
+        Button("Маршрутизация…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "routing")
+        }
         Divider()
         Button("Завершить TunnelDeck") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
@@ -55,6 +59,8 @@ struct ConnectionCommands: Commands {
                 .keyboardShortcut("i").disabled(!model.canManageProfiles)
         }
         CommandGroup(after: .toolbar) {
+            Button("Маршрутизация…") { openWindow(id: "routing") }
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Button("Диагностика") { openWindow(id: "diagnostics") }
                 .keyboardShortcut("l", modifiers: [.command, .option])
         }
