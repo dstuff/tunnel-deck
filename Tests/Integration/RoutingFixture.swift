@@ -1,4 +1,4 @@
-// Compiled by routing_smoke.py against the application's real TunnelCore objects.
+// Compiled by routing_smoke.py against the application's real TunnelCore sources.
 import Foundation
 import TunnelCore
 
@@ -9,7 +9,7 @@ var policy = RoutingPolicy()
 policy.rules = [
     .init(match: .init(type: .domain, value: "blocked.example"), action: .block),
     .init(match: .init(type: .domain, value: "vpn.example"), action: .vpn),
-    .init(match: .init(type: .domain, value: "direct.example"), action: .direct),
+    .init(match: .init(type: .domainSuffix, value: "direct.example"), action: .direct),
     .init(match: .init(type: .ipCIDR, value: "::1/128"), action: .direct)
 ]
 if args[7] == "country" { policy.rules.append(.init(match: .init(type: .country, value: "RU"), action: .direct)) }

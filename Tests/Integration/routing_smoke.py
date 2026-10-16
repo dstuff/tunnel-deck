@@ -14,6 +14,7 @@ from pathlib import Path
 import select
 import socket
 import socketserver
+import ssl
 import struct
 import subprocess
 import tempfile
@@ -182,10 +183,13 @@ def udp_request(port, host, target_port, payload):
         return unpack_udp(udp.recv(65536))[2]
 
 
-def http_request(port, host, target_port):
+def http_request(port, host, target_port, http_host=None, tls_context=None):
     control, _ = socks(port, host, target_port)
+    http_host = http_host or host
+    if tls_context:
+        control = tls_context.wrap_socket(control, server_hostname=http_host)
     with control:
-        control.sendall(b"GET / HTTP/1.0\r\nHost: fixture.example\r\n\r\n")
+        control.sendall(f"GET / HTTP/1.0\r\nHost: {http_host}\r\n\r\n".encode())
         data = b""
         while True:
             part = control.recv(65536)
@@ -222,12 +226,28 @@ def main():
     threading.Thread(target=echoes, daemon=True).start()
     with tempfile.TemporaryDirectory(prefix="tunneldeck-routing-") as temporary:
         temp = Path(temporary); os.chmod(temp, 0o700)
+        # Ephemeral local certificate: exercise a real TLS ClientHello/SNI and
+        # HTTPS response without contacting a server or using profile secrets.
+        certificate, key = temp / "fixture.pem", temp / "fixture.key"
+        subprocess.run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                        "-keyout", str(key), "-out", str(certificate), "-days", "1",
+                        "-subj", "/CN=direct.example", "-addext",
+                        "subjectAltName=DNS:direct.example,DNS:vpn.example,DNS:blocked.example"],
+                       check=True, capture_output=True, timeout=30)
+        server_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        server_tls.load_cert_chain(certificate, key)
+        client_tls = ssl.create_default_context(cafile=str(certificate))
+        secure_web = http.server.ThreadingHTTPServer(("127.0.0.1", 0), HTTP)
+        secure_web.socket = server_tls.wrap_socket(secure_web.socket, server_side=True)
+        start(secure_web)
         fixture = temp / "routing-fixture"
-        build = subprocess.check_output(["swift", "build", "--show-bin-path"], cwd=ROOT, text=True).strip()
-        objects = sorted((Path(build) / "TunnelCore.build").glob("*.swift.o"))
-        assert objects, "Run swift build before routing_smoke.py"
-        subprocess.run(["xcrun", "swiftc", "-I", str(Path(build) / "Modules"), str(Path(__file__).with_name("RoutingFixture.swift")),
-                        *map(str, objects), "-o", str(fixture)], check=True, timeout=60)
+        subprocess.run(["xcrun", "swiftc", "-emit-library", "-emit-module", "-module-name", "TunnelCore",
+                        *map(str, sorted((ROOT / "Sources/TunnelCore").glob("*.swift"))),
+                        "-emit-module-path", str(temp / "TunnelCore.swiftmodule"),
+                        "-o", str(temp / "libTunnelCore.dylib")], check=True, timeout=120)
+        subprocess.run(["xcrun", "swiftc", "-I", str(temp), "-L", str(temp), "-lTunnelCore",
+                        "-Xlinker", "-rpath", "-Xlinker", str(temp),
+                        str(Path(__file__).with_name("RoutingFixture.swift")), "-o", str(fixture)], check=True, timeout=60)
         # Synthetic GeoIP covers only loopback; the production database is tested separately.
         cidr = b"\x0a\x04\x7f\x00\x00\x01\x10\x20"
         entry = b"\x0a\x02RU\x12" + bytes([len(cidr)]) + cidr
@@ -237,6 +257,7 @@ def main():
             config_path = temp / f"{mode}-{scenario}.json"
             subprocess.run([str(fixture), str(config_path), str(traffic), str(probe), str(real_dns), str(relay.server_address[1]), mode, scenario, str(system_probe)], check=True)
             config = json.loads(config_path.read_text())
+            config["log"]["loglevel"] = "debug"
             for server in config["dns"]["servers"]:
                 if server["address"].startswith("tcp://"):
                     server["address"] = f"tcp://127.0.0.1:{dns.server_address[1]}"
@@ -266,6 +287,25 @@ def main():
                 before = counts["tcp"][web.server_port]
                 http_request(traffic, "direct.example", web.server_port)
                 assert counts["tcp"][web.server_port] == before, "Direct rule used VPN proxy"
+                for destination_ip, target, tls_context in [
+                    ("127.0.0.1", web, None),
+                    ("127.0.0.1", secure_web, client_tls),
+                    # DNS returns 127.0.0.1, but this listener is IPv6-only:
+                    # route-only sniffing must retain the original ::1 target.
+                    ("::1", web6, None),
+                ]:
+                    before = counts["tcp"][target.server_port]
+                    http_request(traffic, destination_ip, target.server_port, "direct.example", tls_context)
+                    assert counts["tcp"][target.server_port] == before, "Cached/DoH IP with direct Host/SNI used VPN"
+                    http_request(traffic, destination_ip, target.server_port, "vpn.example", tls_context)
+                    if mode == "proxy":
+                        assert counts["tcp"][target.server_port] > before, "Cached/DoH IP with VPN Host/SNI bypassed VPN"
+                    try:
+                        http_request(traffic, destination_ip, target.server_port, "blocked.example", tls_context)
+                    except (EOFError, OSError, AssertionError):
+                        pass
+                    else:
+                        raise AssertionError("Cached/DoH IP with blocked Host/SNI passed")
                 http_request(traffic, "::1", web6.server_port)
                 before = counts["tcp"][web.server_port]
                 http_request(traffic, "country.example", web.server_port)
@@ -286,7 +326,27 @@ def main():
                 answer = udp_request(traffic, "198.18.0.2", 53, query)
                 fake_ip = socket.inet_ntoa(answer[-4:])
                 assert ipaddress.ip_address(fake_ip) in ipaddress.ip_network("198.19.0.0/16"), fake_ip
-                http_request(traffic, fake_ip, web.server_port)
+                before = counts["tcp"][web.server_port]
+                http_request(traffic, fake_ip, web.server_port, "direct.example")
+                if mode == "proxy":
+                    assert counts["tcp"][web.server_port] > before, "HTTP Host replaced the known FakeDNS VPN identity"
+                for direct_host in ("direct.example", "sub.direct.example"):
+                    direct_answer = udp_request(traffic, "198.18.0.2", 53, dns_query(direct_host))
+                    direct_fake = socket.inet_ntoa(direct_answer[-4:])
+                    assert ipaddress.ip_address(direct_fake) in ipaddress.ip_network("198.19.0.0/16")
+                    before = counts["tcp"][web.server_port]
+                    http_request(traffic, direct_fake, web.server_port, "vpn.example")
+                    assert counts["tcp"][web.server_port] == before, "FQDN FakeDNS direct rule used VPN"
+                blocked_answer = udp_request(traffic, "198.18.0.2", 53, dns_query("blocked.example"))
+                blocked_fake = socket.inet_ntoa(blocked_answer[-4:])
+                assert ipaddress.ip_address(blocked_fake) in ipaddress.ip_network("198.19.0.0/16"), blocked_answer.hex()
+                try:
+                    http_request(traffic, blocked_fake, web.server_port, "direct.example")
+                except (EOFError, OSError, AssertionError):
+                    pass
+                else:
+                    raise AssertionError("HTTP Host bypassed the known FakeDNS block identity: " +
+                                         (temp / f"{mode}-{scenario}.log").read_text()[-12000:])
                 # Browsers use FakeDNS identities, including for country rules.
                 # A domain-only SOCKS request does not exercise this recovery path.
                 country_answer = udp_request(traffic, "198.18.0.2", 53, dns_query("country.example"))
@@ -309,9 +369,10 @@ def main():
                 process.terminate(); process.wait(timeout=10); log.close()
                 process, log = launch()
                 http_request(traffic, fake_ip, web.server_port)
-                print(f"PASS {mode}/{scenario}: TCP, UDP, IPv6, block, DNS, forced VPN probe, cached FakeDNS after restart")
+                print(f"PASS {mode}/{scenario}: TCP, UDP, IPv6, cached/DoH IP HTTP/TLS routing, original IP, FakeDNS identity, block, DNS, forced VPN probe, restart")
             finally:
                 process.terminate(); process.wait(timeout=10); log.close()
+        secure_web.shutdown(); secure_web.server_close()
     for server in (dns, relay, web, web6):
         server.shutdown(); server.server_close()
     print("Routing smoke passed; no system routes, DNS settings or external VPN sessions were changed.")

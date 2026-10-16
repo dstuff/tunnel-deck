@@ -81,7 +81,7 @@ final class RoutingTests: XCTestCase {
         XCTAssertEqual(rules[0]["inboundTag"] as? [String], ["td-probe"])
         let userRules = rules.filter { $0["ruleTag"] != nil }
         XCTAssertEqual(userRules[0]["ip"] as? [String], ["geoip:ru"])
-        XCTAssertEqual(userRules[1]["domain"] as? [String], ["domain:example.org"])
+        XCTAssertEqual(userRules[1]["domain"] as? [String], ["domain:example.org", "domain:example.org."])
         XCTAssertEqual(rules.last?["outboundTag"] as? String, "td-direct")
         let outbounds = json["outbounds"] as! [[String: Any]]
         let vpn = outbounds.first { $0["tag"] as? String == "td-vpn" }!

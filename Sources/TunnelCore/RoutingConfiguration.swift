@@ -52,8 +52,11 @@ public enum RoutingConfiguration {
              "settings": ["auth": "noauth", "udp": true, "ip": "127.0.0.1"]]
         }
         var traffic = socks(trafficPort, "td-traffic")
-        // Recover only DNS identities; HTTP Host/SNI must not replace a known target and bypass its rule.
-        traffic["sniffing"] = ["enabled": true, "destOverride": ["fakedns"], "metadataOnly": true]
+        // Chrome may use cached IPs or DoH instead of the system's FakeDNS.
+        // Recover visible web names for routing while retaining real target IPs.
+        // Xray gives a known FakeDNS identity priority over payload Host/SNI.
+        traffic["sniffing"] = ["enabled": true, "destOverride": ["fakedns", "http", "tls", "quic"],
+                               "metadataOnly": false, "routeOnly": true]
         var inbounds: [[String: Any]] = [traffic, socks(probePort, "td-probe"),
             ["tag": "td-dns-real", "listen": "127.0.0.1", "port": Int(dnsPort), "protocol": "dokodemo-door",
              "settings": ["address": defaultResolvers[0], "port": 53, "network": "tcp,udp"]]]
@@ -73,8 +76,10 @@ public enum RoutingConfiguration {
             var compiled: [String: Any] = ["type": "field", "inboundTag": ["td-traffic"], "outboundTag": rule.action.outboundTag,
                                             "ruleTag": "td-rule-" + rule.id.uuidString]
             switch rule.match.type {
-            case .domain: compiled["domain"] = ["full:" + rule.match.value]
-            case .domainSuffix: compiled["domain"] = ["domain:" + rule.match.value]
+            // DNS wire names recovered from FakeDNS include the root dot.
+            // Xray's routing matcher treats it literally, unlike its DNS matcher.
+            case .domain: compiled["domain"] = ["full:" + rule.match.value, "full:" + rule.match.value + "."]
+            case .domainSuffix: compiled["domain"] = ["domain:" + rule.match.value, "domain:" + rule.match.value + "."]
             case .ipCIDR: compiled["ip"] = [rule.match.value]
             case .country: compiled["ip"] = ["geoip:" + rule.match.value.lowercased()]
             }
