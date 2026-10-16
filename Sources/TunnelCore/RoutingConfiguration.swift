@@ -5,6 +5,7 @@ public enum RoutingConfiguration {
     public static let fakeIPv4Pool = "198.19.0.0/16"
     public static let fakeIPv6Pool = "2001:2::/48"
     public static let resolverAddress = "198.18.0.2"
+    // Reserved TCP/443 on td-traffic; keep the runtime dispatcher exception in sync.
     public static let systemProbeAddress = "198.18.0.3"
 
     public static func make(policy input: RoutingPolicy, trafficPort: UInt16, probePort: UInt16, dnsPort: UInt16,

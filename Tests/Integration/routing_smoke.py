@@ -232,7 +232,7 @@ def main():
         subprocess.run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
                         "-keyout", str(key), "-out", str(certificate), "-days", "1",
                         "-subj", "/CN=direct.example", "-addext",
-                        "subjectAltName=DNS:direct.example,DNS:vpn.example,DNS:blocked.example"],
+                        "subjectAltName=DNS:direct.example,DNS:vpn.example,DNS:blocked.example,DNS:example.com"],
                        check=True, capture_output=True, timeout=30)
         server_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         server_tls.load_cert_chain(certificate, key)
@@ -262,7 +262,7 @@ def main():
                 if server["address"].startswith("tcp://"):
                     server["address"] = f"tcp://127.0.0.1:{dns.server_address[1]}"
             next(item for item in config["outbounds"] if item["tag"] == "td-dns-out")["settings"]["port"] = dns.server_address[1]
-            next(item for item in config["inbounds"] if item["tag"] == "td-system-probe")["settings"].update(address="127.0.0.1", port=web.server_port)
+            next(item for item in config["inbounds"] if item["tag"] == "td-system-probe")["settings"].update(address="127.0.0.1", port=secure_web.server_port)
             config_path.write_text(json.dumps(config))
             env = dict(os.environ, XRAY_LOCATION_ASSET=str(temp), TUNNELDECK_FAKE_DNS_CACHE=str(temp / "fake"))
             checked = subprocess.run([str(binary), "run", "-test", "-config", str(config_path)], env=env, capture_output=True, text=True)
@@ -362,14 +362,17 @@ def main():
                 http_request(probe, "direct.example", web.server_port)
                 if mode == "proxy":
                     assert counts["tcp"][web.server_port] > before, "Diagnostic probe was diverted by a direct rule"
-                before = counts["tcp"][web.server_port]
-                http_request(traffic, "198.18.0.3", 443)
-                if mode == "proxy":
-                    assert counts["tcp"][web.server_port] > before, "System-path diagnostic was diverted by user rules"
+                # The real TUN check sends a TLS ClientHello with SNI. A plain
+                # request to the reserved IP misses the sniffing/IPOnDemand conflict.
+                for probe_host in ("example.com", "direct.example", "blocked.example", "vpn.example"):
+                    before = counts["tcp"][secure_web.server_port]
+                    http_request(traffic, "198.18.0.3", 443, probe_host, client_tls)
+                    if mode == "proxy":
+                        assert counts["tcp"][secure_web.server_port] > before, "System TLS diagnostic was diverted by user rules"
                 process.terminate(); process.wait(timeout=10); log.close()
                 process, log = launch()
                 http_request(traffic, fake_ip, web.server_port)
-                print(f"PASS {mode}/{scenario}: TCP, UDP, IPv6, cached/DoH IP HTTP/TLS routing, original IP, FakeDNS identity, block, DNS, forced VPN probe, restart")
+                print(f"PASS {mode}/{scenario}: TCP, UDP, IPv6, cached/DoH IP HTTP/TLS routing, original IP, FakeDNS identity, block, DNS, forced VPN and system TLS probes, restart")
             finally:
                 process.terminate(); process.wait(timeout=10); log.close()
         secure_web.shutdown(); secure_web.server_close()

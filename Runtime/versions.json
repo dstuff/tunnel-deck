@@ -39,19 +39,20 @@
   {
     "name": "xray",
     "path": "xray/xray",
-    "version": "26.3.27+tunneldeck.3",
+    "version": "26.3.27+tunneldeck.4",
     "source": "https://github.com/XTLS/Xray-core/tree/v26.3.27",
-    "sha256": "695a9f308191a612f48d7e89f6379067ff35c6933772fb4432d1876a41b54643",
+    "sha256": "7a7442f085711f333e0d69d13de16adfce11be452dfdc93433190cbc34e1f0c1",
     "distribution": "TunnelDeck modified source build",
     "sourceArchive": "https://github.com/XTLS/Xray-core/archive/refs/tags/v26.3.27.tar.gz",
     "sourceArchiveSha256": "992a4997e6bb846d11469435d687f99ef812fcde1e0a009bb8e95189ea20331d",
     "patch": "script/xray_compat.patch",
-    "patchSha256": "5434f229132d11395aa910bffece591738f35da6759f3a14b02d8c138c781ff6",
+    "patchSha256": "8ab30eb103d9ca4d39cfda15f3adec1673cdc29a25fbc270d4739e18fdd3f572",
     "toolchain": "go1.26.0",
     "buildScript": "script/build_xray_compat.sh",
     "routingSources": {
       "fake_persistence.go": "d3a38d103db8fdf31489b2343ed475ec78f16c223dbf1aae6bdb8253340cf98d",
-      "fake_persistence_test.go": "96cfe7518a31ceeefb64f29690dd3071f8ce42172f833e113e89f0445a21db89"
+      "fake_persistence_test.go": "96cfe7518a31ceeefb64f29690dd3071f8ce42172f833e113e89f0445a21db89",
+      "system_probe_test.go": "a3f2fcf2b240b2a9c1bcbfa97031f4056fef4450f288685dfbe802fec281781e"
     }
   },
   {

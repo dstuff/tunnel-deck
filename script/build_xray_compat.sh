@@ -24,6 +24,7 @@ cd "$XRAY_BUILD_DIR"
 patch -p1 -i "$XRAY_ROOT_DIR/script/xray_compat.patch"
 cp "$XRAY_ROOT_DIR/script/xray-routing/fake_persistence.go" app/dns/fakedns/tunneldeck_persistence.go
 cp "$XRAY_ROOT_DIR/script/xray-routing/fake_persistence_test.go" app/dns/fakedns/tunneldeck_persistence_test.go
+cp "$XRAY_ROOT_DIR/script/xray-routing/system_probe_test.go" app/dispatcher/tunneldeck_system_probe_test.go
 
 export GOCACHE="$XRAY_ROOT_DIR/.runtime-sources/go-cache"
 export GOMODCACHE="$XRAY_ROOT_DIR/.runtime-sources/go-mod"
@@ -32,8 +33,9 @@ export CGO_ENABLED=0 GOOS=darwin GOARCH=arm64
 go mod download
 go test ./transport/internet/reality -run '^TestTunnelDeckSafari15' -count=1
 go test ./app/dns/fakedns ./proxy/dns -count=1
+go test ./app/dispatcher -run '^TestTunnelDeckSystemProbe' -count=1
 go build -trimpath -buildvcs=false -gcflags=all=-l=4 \
-    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.3 -s -w -buildid=' \
+    '-ldflags=-X github.com/xtls/xray-core/core.build=TunnelDeck.4 -s -w -buildid=' \
     -o "$XRAY_BUILD_DIR/xray-tunneldeck" ./main
 install -m 755 "$XRAY_BUILD_DIR/xray-tunneldeck" "$XRAY_ROOT_DIR/Runtime/xray/xray"
 "$XRAY_ROOT_DIR/Runtime/xray/xray" version

@@ -8,7 +8,7 @@ import sys
 root = Path(sys.argv[1])
 release_inputs = {
     "bin/openconnect": "a111ab17121c5ed7b4a08cadb8c680e6dbe004ef131a2ce124aa405cd3656d21",
-    "xray/xray": "695a9f308191a612f48d7e89f6379067ff35c6933772fb4432d1876a41b54643",
+    "xray/xray": "7a7442f085711f333e0d69d13de16adfce11be452dfdc93433190cbc34e1f0c1",
     "geoip/geoip.dat": "6c41fbfcc29a2503b442ae8a1dc51edbf2d99a0511aecd798feecac6cb95aaa2",
     "geoip/countries.bin": "3b29d2a81a6f318fad179ce4284cb22e53b8d41b2a61c4d28925a410c4b53662",
     "bin/hev-socks5-tunnel": "c72e2d99b698542105e10777a5105a60bb04f4d80bfbf95f20f3365cb77e5d47",
@@ -34,7 +34,7 @@ entries = [
      "https://github.com/amnezia-vpn/amneziawg-go/tree/v3.1.20260828"),
     ("awg", "bin/awg", "3.1.20260812",
      "https://github.com/amnezia-vpn/amneziawg-tools/tree/v3.1.20260812"),
-    ("xray", "xray/xray", "26.3.27+tunneldeck.3",
+    ("xray", "xray/xray", "26.3.27+tunneldeck.4",
      "https://github.com/XTLS/Xray-core/tree/v26.3.27"),
     ("hev-socks5-tunnel", "bin/hev-socks5-tunnel", "2.19.0",
      "https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.19.0"),

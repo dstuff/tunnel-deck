@@ -212,3 +212,14 @@
 @@ -281,0 +294,2 @@
 +	}
 +
+--- a/app/dispatcher/default.go
++++ b/app/dispatcher/default.go
+@@ -235,0 +236,8 @@
++	// Preserve TunnelDeck's reserved TUN diagnostic destination. Otherwise
++	// routeOnly SNI plus IPOnDemand resolves the web name before the bridge
++	// IP rule and sends this synthetic address to a user-selected outbound.
++	if inbound := session.InboundFromContext(ctx); inbound != nil && inbound.Tag == "td-traffic" &&
++		destination.Network == net.Network_TCP && destination.Port == 443 &&
++		destination.Address.String() == "198.18.0.3" {
++		return false
++	}

@@ -20,7 +20,7 @@ struct SettingsView: View {
                 }
             }
             Section {
-                Text("OpenConnect 9.21 · AmneziaWG 3.1.20260828 · Xray 26.3.27 + TunnelDeck.3")
+                Text("OpenConnect 9.21 · AmneziaWG 3.1.20260828 · Xray 26.3.27 + TunnelDeck.4")
                 Text("Все данные подключений, включая пароли и конфигурации, автоматически сохраняются локально на этом Mac. Одновременно работает одно подключение.")
                     .foregroundStyle(.secondary)
             }.font(.callout)

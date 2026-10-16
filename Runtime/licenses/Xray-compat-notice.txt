@@ -1,4 +1,4 @@
-TunnelDeck Xray compatibility build: 26.3.27+tunneldeck.3
+TunnelDeck Xray compatibility build: 26.3.27+tunneldeck.4
 
 This is a TunnelDeck modification of Xray-core v26.3.27, not an unmodified
 upstream release. Xray-core is distributed under the Mozilla Public License 2.0;
@@ -21,7 +21,7 @@ uTLS Safari 16 preset, removes ALPN, and keeps one RSA-PSS-SHA384 signature
 entry. This implements the compatibility profile using public uTLS presets
 and TLS configuration values. Other fingerprints retain their
 upstream behavior. Xray's numeric version and REALITY authentication version
-are unchanged. The runtime identifies this build as TunnelDeck.3.
+are unchanged. The runtime identifies this build as TunnelDeck.4.
 
 The profile approximates the observed default Safari 15.5 ClientHello. It does
 not claim byte-for-byte equivalence to native BoringSSL serialization or TCP
@@ -34,3 +34,9 @@ Routing additions in TunnelDeck.3:
 The additional source and tests are in script/xray-routing/ and are copied by
 the build script after applying xray_compat.patch. These sources are provided
 under MPL 2.0 and included in the application bundle under Runtime/source.
+
+Routing fix in TunnelDeck.4:
+- Preserve the original TCP destination 198.18.0.3:443 only on td-traffic when
+  sniffing HTTP/TLS, so the system TUN diagnostic reaches its reserved bridge
+  before user rules. Other destinations and inbounds retain upstream sniffing
+  and IPOnDemand behavior. Regression tests include TLS with verified SNI.
