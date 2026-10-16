@@ -6,7 +6,7 @@ Requirements: macOS 14+, Apple Silicon, Xcode command-line tools, Go 1.24+
 Build and launch:
   ./script/prepare_runtimes.sh     # first setup; downloads official engines
   ./script/build_and_run.sh       # builds, stages and signs dist/TunnelDeck.app
-  swift test                     # configuration and credential-handling tests
+  swift test                     # configuration, persistence and connection workflows
   python3 Tests/Integration/engine_smoke.py  # local real-engine checks, no routes
 
 Open Package.swift in Xcode to work on the project. The project-local Codex
@@ -17,6 +17,23 @@ Resources/AppIcon.png is the transparent master; Resources/AppIcon.icns is the
 standalone macOS icon. script/build_icon.sh regenerates the .icns with all
 standard and Retina sizes. The build/run script also generates and embeds the
 icon automatically and declares it in the app's Info.plist.
+
+Daily controls: the main window is a compact profile list (selected UI concept 1).
+Each row connects directly or switches from the active profile. The top status
+area disconnects/cancels; switching waits for the previous session's cleanup
+before starting the next one, and can be cancelled. Add Connection (Command-N)
+accepts a server address, VLESS/Trojan link, JSON or AWG .conf, including file
+selection and drag/drop. Local format recognition does not verify a handshake.
+Profile settings open from the row's ellipsis menu (or Command-I) and save automatically;
+diagnostics open separately (Option-Command-L). Active profiles cannot be deleted.
+Closing the main window keeps the app and VPN available from the menu bar.
+Administrator confirmation is still required when starting a real tunnel.
+
+UI verification: ./script/build_and_run.sh --preview launches a DEBUG-only
+isolated design preview with synthetic profiles in a separate temporary file. Connect,
+disconnect and check are simulated in that mode: no helper or network
+requests. Normal launch uses the actual saved profiles and engines. The selected
+mock and visual QA evidence are in Design/ConnectionList/ and design-qa.md.
 
 Implemented backends:
 • OpenConnect / ocserv: a single server field accepts the complete HTTPS URL,
@@ -70,13 +87,19 @@ FIFO controls disconnect. The helper watches the UI process and restores its
 owned routes/DNS on normal disconnect or UI exit. Imported AWG hooks are rejected.
 Authentication password is not forwarded to the root helper: only its cookie.
 The helper creates root-only working files and removes them after stopping.
-Profile metadata contains no password, query secret or private configuration.
-Profile edits are saved automatically, including the selected profile and each
-profile's Keychain preference. Credentials/configurations persist in Keychain
-by default; the profile toggle can opt out. Pending edits are flushed when
-switching profiles and quitting. Older profile files are migrated on save.
-Incomplete server input is retained in Keychain until it can be normalized.
-Sidebar dots share the main window's profile-specific connection status.
+All profile data, including passwords, camouflage, original AWG/Xray configurations,
+unfinished server input and the selected profile, is saved automatically to
+~/Library/Application Support/TunnelDeck/profiles.json. The version 2 JSON document
+contains profile metadata and secrets indexed by profile UUID. It has no additional
+encryption; the directory is restricted to 0700 and files to 0600. Replacement is
+atomic, with a private temporary file. The app does not access Keychain and has no
+option to disable persistence for individual profiles. Pending edits are flushed
+when switching profiles and quitting. Older metadata documents and profile arrays
+are migrated on save, preserving IDs, order and selection; old Keychain secrets
+are not imported and must be entered again. Session authentication cookies remain
+temporary. A read/format error blocks writing until the file is repaired and the
+app restarted; a failed write preserves the last document and the current edits.
+Profile rows share the main window's profile-specific connection status.
 The menu bar uses a chain, a circled chain while busy, and a filled circle
 around the chain when connected.
 Application logs are sanitized before they reach the UI or its copy action.
@@ -92,8 +115,11 @@ Current testing scope:
 Automated tests cover camouflage URL preservation, configuration injection,
 AWG advanced parameters, Xray import/isolation and credential redaction.
 The Swift suite also covers automatic persistence/reload for every protocol,
-legacy migration, profile selection, Keychain opt-out/failure, pending edits
-on deletion, incomplete server input, and profile-specific status indicators.
+legacy migration, profile selection, file permissions, failed writes, damaged or
+unsupported documents, pending edits on deletion, incomplete server input, and
+profile-specific status indicators. The current suite passes 39 tests, including
+12 persistence tests. Persistence tests use temporary files and
+synthetic credentials, without accessing real user profiles or Keychain.
 Local real-engine checks passed: OpenConnect sends
 the exact initial camouflage POST over pinned TLS; official AWG tools parse
 3.1 ranges/header protection/I1/I3; Xray parses a VLESS/REALITY configuration.
@@ -108,7 +134,8 @@ official core's Chrome preset. The separate lwIP packet path also starts and
 configures its interface. With both changes, the real system tunnel passed UDP
 DNS resolution through 1.1.1.1 and 8/8 simultaneous HTTPS requests; the GUI
 confirmed Connected. Normal disconnect restored the en0 default route and
-removed utun300. 26 Swift tests and two offline ClientHello tests passed.
+removed utun300. At that live verification on 15 October 2026, 26 Swift tests
+and two offline ClientHello tests passed; the current Swift suite is described above.
 IPv6-only upstreams and sleep/roaming remain outside this live verification.
 The patched core rebuilds reproducibly from the pinned source plus repo patch;
 the app bundle includes that patch and the third-party license notice.

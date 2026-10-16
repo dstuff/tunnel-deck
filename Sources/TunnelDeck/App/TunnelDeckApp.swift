@@ -2,30 +2,34 @@ import SwiftUI
 import AppKit
 
 @main struct TunnelDeckApp: App {
-    @State private var model = AppModel()
+    @State private var model = AppModel.applicationModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     var body: some Scene {
-        WindowGroup("TunnelDeck", id: "main") {
+        WindowGroup("TunnelDeck", id: "connections") {
             ContentView(model: model)
+                .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? .dark : nil)
                 .onAppear { appDelegate.model = model }
         }
-        .defaultSize(width: 1080, height: 810)
-        .commands {
-            CommandGroup(replacing: .newItem) {
-                Menu("Новое подключение") {
-                    Button("OpenConnect") { model.add(.openConnect) }
-                    Button("AmneziaWG 3.1") { model.add(.amneziaWG) }
-                    Button("Xray") { model.add(.xray) }
-                }.disabled(model.connection.locked)
-            }
+        .defaultSize(width: 780, height: 630)
+        .commands { ConnectionCommands(model: model) }
+        Window("Настройки подключения", id: "profile-editor") {
+            ProfileEditor(model: model)
+                .tint(.blue)
         }
+        .defaultSize(width: 640, height: 620)
+        .windowResizability(.contentMinSize)
+        Window("Новое подключение", id: "add-connection") {
+            AddConnectionView(model: model)
+                .tint(.blue)
+        }
+        .windowResizability(.contentSize)
+        Window("Диагностика", id: "diagnostics") {
+            LogView(connection: model.connection).frame(minWidth: 600, minHeight: 300)
+        }
+        .defaultSize(width: 780, height: 460)
         Settings { SettingsView(connection: model.connection) }
         MenuBarExtra {
-            Text(model.connection.state.title)
-            Button("Открыть TunnelDeck") { NSApp.activate(ignoringOtherApps: true); NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil) }
-            if model.connection.locked { Button("Отключить") { model.connection.disconnect() } }
-            Divider()
-            Button("Завершить TunnelDeck") { NSApp.terminate(nil) }.keyboardShortcut("q")
+            MenuBarActions(model: model)
         } label: {
             Label("TunnelDeck — \(model.connection.state.title)", systemImage: model.connection.state.menuBarSymbol)
                 .labelStyle(.iconOnly)
@@ -46,8 +50,9 @@ import AppKit
             alert.runModal()
             return .terminateCancel
         }
+        model?.switcher.cancel()
         guard let connection = model?.connection, connection.locked else { return .terminateNow }
-        connection.disconnect()
+        model?.disconnect()
         Task { @MainActor in
             for _ in 0..<80 {
                 if !connection.hasSession { NSApp.reply(toApplicationShouldTerminate: true); return }

@@ -19,7 +19,7 @@ public enum VPNProtocol: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-// Only non-secret profile metadata is stored in the preferences file.
+// Connection metadata stays separate from secrets in memory and in helper requests.
 public struct VPNProfile: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String
@@ -43,7 +43,7 @@ public struct ProfileSecrets: Codable, Sendable {
     public var password = ""
     public var camouflage = ""
     public var configuration = ""
-    // Incomplete or invalid server input belongs in Keychain, never in metadata.
+    // Preserve unfinished input alongside secrets until it can be normalized.
     public var serverInput: String?
     public init() {}
 }

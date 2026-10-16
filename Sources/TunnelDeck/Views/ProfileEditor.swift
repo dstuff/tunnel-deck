@@ -3,6 +3,7 @@ import TunnelCore
 
 struct ProfileEditor: View {
     @Bindable var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     private var state: ConnectionState { model.connection.state(for: model.draft.id) }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -19,7 +20,7 @@ struct ProfileEditor: View {
                     }
                 }
                 Spacer()
-                if let date = model.connection.connectedAt {
+                if model.connection.activeProfile == model.draft.id, let date = model.connection.connectedAt {
                     TimelineView(.periodic(from: date, by: 1)) { context in
                         Text(Duration.seconds(Int(context.date.timeIntervalSince(date))).formatted(.time(pattern: .hourMinuteSecond)))
                             .monospacedDigit().foregroundStyle(.secondary)
@@ -52,7 +53,6 @@ struct ProfileEditor: View {
                         Text(model.draft.kind == .amneziaWG ? "Параметры AWG 3.1 сохраняются целиком, включая защиту заголовков и диапазоны таймеров." : "Исходящие подключения и правила Xray используются в системном TUN-режиме. Входящие из JSON заменяются туннелем приложения.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Toggle("Сохранить секреты в Связке ключей", isOn: $model.rememberSecrets)
                 }
                 if model.draft.kind == .openConnect {
                     Section {
@@ -65,33 +65,31 @@ struct ProfileEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .disabled(model.connection.locked)
+            .disabled(!model.canManageProfiles)
 
             VStack(alignment: .leading, spacing: 10) {
-                if let error = model.persistenceError ?? model.connection.errorMessage {
+                if let error = model.persistenceError ?? (model.connection.statusProfile == model.draft.id ? model.connection.errorMessage : nil) {
                     Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.red)
                         .font(.callout).textSelection(.enabled).lineLimit(4)
-                } else if let result = model.connection.checkResult {
+                } else if model.connection.statusProfile == model.draft.id, let result = model.connection.checkResult {
                     Label(result, systemImage: "checkmark.circle").foregroundStyle(.secondary).font(.callout)
                 } else if let notice = model.notice {
                     Text(notice).font(.caption).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
                     Button("Проверить", systemImage: "stethoscope") { model.check() }
-                        .disabled(model.connection.locked)
+                        .disabled(model.connection.locked || model.switcher.isSwitching)
                     Spacer()
-                    if model.connection.locked {
-                        Button(model.connection.state == .disconnecting ? "Отключаем…" : "Отключить") { model.connection.disconnect() }
-                            .disabled(model.connection.state == .disconnecting)
-                    } else {
-                        Button("Подключить", systemImage: "power") { model.connect() }
-                            .buttonStyle(.borderedProminent).keyboardShortcut(.return, modifiers: .command)
+                    Button("Готово") {
+                        if model.save(showNotice: false) { dismiss() }
                     }
+                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                 }.controlSize(.large)
-                Text("Для настройки VPN macOS запросит пароль администратора. Проверка конфигурации не меняет маршруты.")
+                Text(model.connection.activeProfile == model.draft.id ? "Все данные сохраняются локально. Изменения применятся при следующем подключении." : "Все данные, включая пароли и конфигурации, сохраняются локально автоматически.")
                     .font(.caption).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 26).padding(.bottom, 20)
         }
+        .frame(minWidth: 600, minHeight: 580)
     }
 }

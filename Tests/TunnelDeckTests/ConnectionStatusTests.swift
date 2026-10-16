@@ -29,6 +29,11 @@ import TunnelCore
         XCTAssertEqual(controller.state(for: profile.id), .authorizing)
         XCTAssertEqual(controller.state(for: UUID()), .idle)
         controller.disconnect()
+        XCTAssertTrue(controller.locked)
+        for _ in 0..<100 {
+            if !controller.locked { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         XCTAssertEqual(controller.state(for: profile.id), .idle)
         XCTAssertEqual(ConnectionState.idle.menuBarSymbol, "link")
         XCTAssertEqual(ConnectionState.connected.menuBarSymbol, "link.circle.fill")

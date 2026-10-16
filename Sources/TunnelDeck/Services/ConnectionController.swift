@@ -19,9 +19,18 @@ import TunnelCore
     private var kind = VPNProtocol.openConnect
     private var receivedConnected = false
     private var trafficCheck: Task<Void, Never>?
+    #if DEBUG
+    private var isDesignPreview = false
+
+    func prepareDesignPreview(profile: UUID) {
+        isDesignPreview = true
+        activeProfile = profile; statusProfile = profile; state = .connected
+        connectedAt = Date().addingTimeInterval(-1458)
+    }
+    #endif
     var runtime: RuntimePaths { RuntimePaths(root: Bundle.main.resourceURL!.appendingPathComponent("Runtime")) }
     var hasSession: Bool { privateSession != nil }
-    var locked: Bool { state.busy || hasSession || state == .connected }
+    var locked: Bool { operation != nil || state.busy || hasSession || state == .connected }
 
     func state(for profileID: UUID) -> ConnectionState {
         statusProfile == profileID ? state : .idle
@@ -43,10 +52,18 @@ import TunnelCore
 
     func check(profile: VPNProfile, secrets: ProfileSecrets) {
         guard !locked else { return }
+        #if DEBUG
+        if isDesignPreview {
+            statusProfile = profile.id
+            checkResult = "Предпросмотр интерфейса: сетевые проверки не выполнялись."
+            return
+        }
+        #endif
         statusProfile = profile.id
         state = .checking; errorMessage = nil; checkResult = nil
         configureRedaction(profile: profile, secrets: secrets)
         operation = Task {
+            defer { operation = nil }
             do {
                 try runtime.check(profile.kind)
                 switch profile.kind {
@@ -94,11 +111,18 @@ import TunnelCore
 
     func connect(profile: VPNProfile, secrets: ProfileSecrets) {
         guard !locked else { return }
+        #if DEBUG
+        if isDesignPreview {
+            prepareDesignPreview(profile: profile.id)
+            return
+        }
+        #endif
         activeProfile = profile.id; statusProfile = profile.id; kind = profile.kind; receivedConnected = false
         errorMessage = nil; checkResult = nil; connectedAt = nil
         configureRedaction(profile: profile, secrets: secrets)
         state = profile.kind == .openConnect ? .authorizing : .checking
         operation = Task {
+            defer { operation = nil }
             do {
                 try runtime.check(profile.kind)
                 var request = TunnelRequest(userID: getuid(), parentPID: getpid(), profile: profile, secrets: secrets)
@@ -152,9 +176,15 @@ import TunnelCore
     }
 
     func disconnect() {
+        #if DEBUG
+        if isDesignPreview {
+            state = .idle; activeProfile = nil; connectedAt = nil
+            return
+        }
+        #endif
         operation?.cancel(); process.cancel()
         if let privateSession { state = .disconnecting; privateSession.stop(); append("Завершаем VPN и восстанавливаем сеть…") }
-        else { state = .idle; activeProfile = nil }
+        else { state = operation == nil ? .idle : .disconnecting; activeProfile = nil }
     }
     private func startMonitoring(_ session: PrivateSession) {
         monitor?.cancel()

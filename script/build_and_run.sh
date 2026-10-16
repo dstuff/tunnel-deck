@@ -66,6 +66,9 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     echo "Launched: $APP_BUNDLE"
     ;;
+  --preview)
+    /usr/bin/open -n "$APP_BUNDLE" --args --design-preview
+    ;;
   --debug|debug) lldb -- "$CONTENTS/MacOS/TunnelDeck" ;;
   --logs|logs)
     /usr/bin/open -n "$APP_BUNDLE"
@@ -75,5 +78,5 @@ case "$MODE" in
     /usr/bin/open -n "$APP_BUNDLE"
     /usr/bin/log stream --info --style compact --predicate 'subsystem == "local.TunnelDeck"'
     ;;
-  *) echo "usage: $0 [run|--build-only|--verify|--debug|--logs|--telemetry]" >&2; exit 2 ;;
+  *) echo "usage: $0 [run|--build-only|--verify|--preview|--debug|--logs|--telemetry]" >&2; exit 2 ;;
 esac
