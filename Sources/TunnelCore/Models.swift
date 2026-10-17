@@ -12,7 +12,7 @@ public enum VPNProtocol: String, Codable, CaseIterable, Identifiable, Sendable {
     }
     public var symbol: String {
         switch self {
-        case .openConnect: return "lock.shield"
+        case .openConnect: return "shield"
         case .amneziaWG: return "waveform.path"
         case .xray: return "point.3.connected.trianglepath.dotted"
         }
