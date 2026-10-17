@@ -1,10 +1,12 @@
+import TunnelLocalization
 import Foundation
 import TunnelCore
 
 enum RoutingAddressInspector {
     struct Result: Sendable {
         let action: RoutingAction
-        let explanation: String
+        let explanationContent: LocalizedMessage
+        var explanation: String { explanationContent.resolve() }
         let addresses: [String]
     }
     @MainActor static func check(_ input: String, policy: RoutingPolicy, runtime: RuntimePaths,
@@ -27,17 +29,17 @@ enum RoutingAddressInspector {
                     let result = try await ProcessRunner().run("/usr/bin/dig", args)
                     addresses += result.stdout.components(separatedBy: .whitespacesAndNewlines).filter { IPNetwork.address($0) != nil }
                 }
-                guard !addresses.isEmpty else { throw VPNError("Не удалось получить IP сайта. Результат правил по сетям и странам не определён.") }
+                guard !addresses.isEmpty else { throw VPNError(L10n.message("routingaddressinspector.could_not_resolve_the_website_ip_address_network_and")) }
             }
         }
         try Task.checkCancellation()
         let result = try policy.decision(domain: domain, addresses: addresses, country: country.country)
-        let explanation: String
+        let explanation: LocalizedMessage
         if let index = result.ruleIndex {
             let rule = policy.rules[index]
             let detail = result.matchedIP.map { " (IP \($0))" } ?? ""
-            explanation = "Совпало правило № \(index + 1): \(rule.match.displayValue)\(detail)."
-        } else { explanation = "Ни одно правило не подошло. Используется действие для остального интернета." }
-        return Result(action: result.action, explanation: explanation, addresses: Array(Set(addresses)).sorted())
+            explanation = L10n.message("routingaddressinspector.matched_rule", [.init(index + 1), .init(rule.match.displayMessage), .init(detail)])
+        } else { explanation = L10n.message("routingaddressinspector.no_rule_matched_using_the_action_for_all_other") }
+        return Result(action: result.action, explanationContent: explanation, addresses: Array(Set(addresses)).sorted())
     }
 }

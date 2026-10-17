@@ -2,9 +2,11 @@
 // never executed. No root privileges, routes, DNS changes or VPN credentials.
 import Foundation
 import TunnelCore
+import TunnelLocalization
 
 final class SecureSession {
     func emit(_ kind: TunnelEvent.Kind, _ message: String) {}
+    func emit(_ kind: TunnelEvent.Kind, _ message: LocalizedMessage) {}
 }
 
 struct Invocation: Equatable {
@@ -97,10 +99,13 @@ func testPartialFailureRemovesPhysicalRoute() throws {
     reset(); failCapture = true
     let network = try NetworkConfiguration(session: SecureSession())
     do {
-        try configureCapture(network)
+        // A single family makes the first failed capture deterministic; Set
+        // iteration may otherwise attempt IPv6 before the physical IPv4 route.
+        try network.configure(interface: "utun300", addresses: SocksTunnelConfiguration.addresses,
+                              mtu: SocksTunnelConfiguration.mtu, allowedIPs: ["0.0.0.0/0"], dns: [])
         throw VPNError("Expected capture failure")
     } catch {
-        try expect(error.localizedDescription.contains("Synthetic capture failure"), "Unexpected failure")
+        try expect(error.localizedDescription.contains("Synthetic capture failure"), "Unexpected failure: " + error.localizedDescription)
     }
     network.restore()
     try expect(calls.contains(route("delete", physical(capture4[0]))), "Partial failure must release the physical route")

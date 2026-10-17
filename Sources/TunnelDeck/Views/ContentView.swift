@@ -1,3 +1,4 @@
+import TunnelLocalization
 import SwiftUI
 import AppKit
 import TunnelCore
@@ -15,23 +16,23 @@ struct ContentView: View {
             Button { present("routing") } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "arrow.triangle.branch").foregroundStyle(.secondary)
-                    Text("Маршрутизация")
+                    Text(L10n.text("window.routing"))
                     Text(model.routing.name).foregroundStyle(.secondary).lineLimit(1)
                     Spacer(minLength: 12)
-                    if model.routingPending { Text("Есть изменения").font(.caption).foregroundStyle(.orange) }
-                    Text("Настроить").foregroundStyle(.blue)
+                    if model.routingPending { Text(L10n.text("contentview.changes_pending")).font(.caption).foregroundStyle(.orange) }
+                    Text(L10n.text("contentview.configure")).foregroundStyle(.blue)
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                 }.contentShape(Rectangle()).padding(.horizontal, 28).padding(.vertical, 13)
-            }.buttonStyle(.plain).help("Общие правила для всех подключений")
+            }.buttonStyle(.plain).help(L10n.text("contentview.shared_rules_for_all_connections"))
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Подключения")
+                    Text(L10n.text("contentview.connections"))
                         .font(.callout.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.horizontal, 10).padding(.top, 24)
                     if model.profiles.isEmpty {
-                        ContentUnavailableView("Нет подключений", systemImage: "network",
-                                               description: Text("Добавьте подключение, чтобы настроить VPN."))
+                        ContentUnavailableView(L10n.text("contentview.no_connections"), systemImage: "network",
+                                               description: Text(L10n.text("contentview.add_a_connection_to_set_up_your_vpn")))
                             .frame(maxWidth: .infinity).padding(.vertical, 24)
                     } else {
                         LazyVStack(spacing: 0) {
@@ -52,7 +53,7 @@ struct ContentView: View {
                 Button { present("add-connection") } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
-                        Text("Добавить подключение")
+                        Text(L10n.text("contentview.add_connection"))
                     }.fixedSize()
                 }
                 .buttonStyle(PrimaryConnectionButtonStyle())
@@ -62,12 +63,12 @@ struct ContentView: View {
             .padding(.horizontal, 28).padding(.vertical, 16)
             Divider()
             HStack {
-                Button("Диагностика", systemImage: "waveform.path.ecg") { present("diagnostics") }
+                Button(L10n.text("window.diagnostics"), systemImage: "waveform.path.ecg") { present("diagnostics") }
                 Spacer(minLength: 12)
-                Text("Одновременно работает одно подключение")
+                Text(L10n.text("contentview.one_connection_can_run_at_a_time"))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 12)
-                SettingsLink { Label("Настройки", systemImage: "gearshape") }
+                SettingsLink { Label(L10n.text("window.settings"), systemImage: "gearshape") }
             }
             .buttonStyle(.borderless).foregroundStyle(.secondary)
             .padding(.horizontal, 28).padding(.vertical, 16)
@@ -76,17 +77,17 @@ struct ContentView: View {
         .tint(.blue)
         .navigationTitle("TunnelDeck")
         .onAppear { if CommandLine.arguments.contains("--routing-preview") { present("routing") } }
-        .alert("Удалить подключение?", isPresented: Binding(
+        .alert(L10n.text("contentview.delete_connection"), isPresented: Binding(
             get: { profileToDelete != nil },
             set: { if !$0 { profileToDelete = nil } }
         ), presenting: profileToDelete) { profile in
-            Button("Отмена", role: .cancel) {}
-            Button("Удалить", role: .destructive) {
+            Button(L10n.text("action.cancel"), role: .cancel) {}
+            Button(L10n.text("action.delete"), role: .destructive) {
                 model.select(profile.id)
                 if model.draft.id == profile.id { model.deleteSelected() }
             }
         } message: { profile in
-            Text("«\(profile.name)» и сохранённые для него секреты будут удалены.")
+            Text(L10n.text("contentview.and_its_saved_secrets_will_be_deleted", [.init(profile.name)]))
         }
     }
 

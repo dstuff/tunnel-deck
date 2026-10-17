@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Observation
 import TunnelCore
@@ -13,7 +14,8 @@ extension ConnectionController: ConnectionLifecycle {}
 /// A new tunnel may start only after the previous helper confirms cleanup.
 @MainActor @Observable final class ProfileSwitcher {
     private(set) var targetProfile: UUID?
-    private(set) var errorMessage: String?
+    private var errorMessageContent: LocalizedMessage?
+    var errorMessage: String? { errorMessageContent?.resolve() }
     private let connection: any ConnectionLifecycle
     private let timeout: Duration
     @ObservationIgnored private var operation: Task<Void, Never>?
@@ -28,7 +30,7 @@ extension ConnectionController: ConnectionLifecycle {}
 
     func start(to profile: UUID, connect: @escaping @MainActor () -> Void) {
         guard !isSwitching, connection.state == .connected else { return }
-        errorMessage = nil
+        errorMessageContent = nil
         targetProfile = profile
         let operationID = UUID()
         self.operationID = operationID
@@ -39,14 +41,14 @@ extension ConnectionController: ConnectionLifecycle {}
             do {
                 while connection.locked {
                     guard ContinuousClock.now < deadline else {
-                        throw VPNError("Сеть ещё восстанавливается. Дождитесь отключения и повторите переключение.")
+                        throw VPNError(L10n.message("profileswitcher.the_network_is_still_being_restored_wait_for_disconnection"))
                     }
                     try await Task.sleep(for: .milliseconds(100))
                 }
                 try Task.checkCancellation()
                 guard self.operationID == operationID else { return }
                 guard connection.state == .idle else {
-                    throw VPNError("Не удалось штатно завершить подключение. Проверьте диагностику перед повторной попыткой.")
+                    throw VPNError(L10n.message("profileswitcher.the_connection_did_not_shut_down_normally_check_diagnostics"))
                 }
                 targetProfile = nil
                 operation = nil
@@ -54,7 +56,7 @@ extension ConnectionController: ConnectionLifecycle {}
                 connect()
             } catch {
                 guard self.operationID == operationID else { return }
-                if !Task.isCancelled { errorMessage = error.localizedDescription }
+                if !Task.isCancelled { errorMessageContent = error.localizedMessage }
                 targetProfile = nil
                 operation = nil
                 self.operationID = nil
@@ -69,5 +71,5 @@ extension ConnectionController: ConnectionLifecycle {}
         targetProfile = nil
     }
 
-    func clearError() { errorMessage = nil }
+    func clearError() { errorMessageContent = nil }
 }

@@ -1,18 +1,19 @@
+import TunnelLocalization
 import Foundation
 
 enum ConnectionState: String {
     case idle, checking, authorizing, permission, configuring, waiting, connected, disconnecting, failed
     var title: String {
         switch self {
-        case .idle: return "Не подключено"
-        case .checking: return "Проверяем конфигурацию"
-        case .authorizing: return "Авторизация"
-        case .permission: return "Ожидаем разрешение macOS"
-        case .configuring: return "Настраиваем сеть"
-        case .waiting: return "Проверяем соединение"
-        case .connected: return "Подключено"
-        case .disconnecting: return "Отключаем"
-        case .failed: return "Не удалось подключиться"
+        case .idle: return L10n.text("connection.state.idle")
+        case .checking: return L10n.text("connection.state.checking")
+        case .authorizing: return L10n.text("connection.state.authorizing")
+        case .permission: return L10n.text("connection.state.permission")
+        case .configuring: return L10n.text("connection.state.configuring")
+        case .waiting: return L10n.text("connection.state.waiting")
+        case .connected: return L10n.text("connection.state.connected")
+        case .disconnecting: return L10n.text("connection.state.disconnecting")
+        case .failed: return L10n.text("connection.state.failed")
         }
     }
     var busy: Bool { ![.idle, .failed, .connected].contains(self) }
@@ -28,6 +29,8 @@ enum ConnectionState: String {
 struct LogEntry: Identifiable {
     let id = UUID()
     let date: Date
-    let message: String
-    init(_ message: String, date: Date = Date()) { self.message = message; self.date = date }
+    let content: LocalizedMessage
+    var message: String { content.resolve() }
+    init(_ message: LocalizedMessage, date: Date = Date()) { self.content = message; self.date = date }
+    init(_ message: String, date: Date = Date()) { self.init(.verbatim(message), date: date) }
 }

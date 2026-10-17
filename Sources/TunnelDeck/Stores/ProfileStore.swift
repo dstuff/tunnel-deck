@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import TunnelCore
@@ -31,7 +32,7 @@ struct ProfileStore: ProfileStorage {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             let storedVersion = try values.decodeIfPresent(Int.self, forKey: .version) ?? 1
             guard (1...3).contains(storedVersion) else {
-                throw VPNError("Версия локального файла профилей не поддерживается. Обновите приложение или восстановите совместимый файл и перезапустите TunnelDeck.")
+                throw VPNError(L10n.message("profilestore.the_local_profile_file_version_is_not_supported_update"))
             }
             version = 3
             profiles = try values.decode([VPNProfile].self, forKey: .profiles)
@@ -39,7 +40,7 @@ struct ProfileStore: ProfileStorage {
             // Earlier files contain metadata only. Never read their secrets from Keychain.
             secrets = storedVersion >= 2 ? try values.decode([String: ProfileSecrets].self, forKey: .secrets) : [:]
             routing = storedVersion >= 3 ? try values.decode(RoutingPolicy.self, forKey: .routing) : .init()
-            guard routing.format == "tunneldeck-routing", routing.version == 1 else { throw VPNError("Версия локальной схемы маршрутизации не поддерживается.") }
+            guard routing.format == "tunneldeck-routing", routing.version == 1 else { throw VPNError(L10n.message("profilestore.the_local_routing_policy_version_is_not_supported")) }
         }
     }
 
@@ -54,7 +55,7 @@ struct ProfileStore: ProfileStorage {
         let data: Data
         do { data = try Data(contentsOf: file) }
         catch CocoaError.fileReadNoSuchFile { return nil }
-        catch { throw VPNError("Не удалось прочитать локальный файл профилей. Проверьте доступ к файлу и перезапустите TunnelDeck.") }
+        catch { throw VPNError(L10n.message("profilestore.could_not_read_the_local_profile_file_check_file")) }
         do {
             let decoder = JSONDecoder()
             if let profiles = try? decoder.decode([VPNProfile].self, from: data) {
@@ -62,7 +63,7 @@ struct ProfileStore: ProfileStorage {
             }
             return try decoder.decode(Document.self, from: data)
         } catch let error as VPNError { throw error }
-        catch { throw VPNError("Локальный файл профилей повреждён. Исправьте или восстановите файл и перезапустите TunnelDeck. Исходный файл не изменён.") }
+        catch { throw VPNError(L10n.message("profilestore.the_local_profile_file_is_damaged_repair_or_restore")) }
     }
 
     func save(_ document: Document) throws {
@@ -89,7 +90,7 @@ struct ProfileStore: ProfileStorage {
             try handle.close()
             guard Darwin.rename(temporary.path, file.path) == 0 else { throw POSIXError(.EIO) }
         } catch {
-            throw VPNError("Не удалось записать локальный файл профилей. Проверьте права доступа и свободное место.")
+            throw VPNError(L10n.message("profilestore.could_not_write_the_local_profile_file_check_permissions"))
         }
     }
 }

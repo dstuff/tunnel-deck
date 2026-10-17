@@ -1,3 +1,4 @@
+import TunnelLocalization
 import SwiftUI
 import TunnelCore
 
@@ -28,12 +29,12 @@ struct ProfileRowView: View {
             .help(profile.name)
             Spacer(minLength: 16)
             if state == .connected {
-                Label("Подключено", systemImage: "circle.fill")
+                Label(L10n.text("connection.state.connected"), systemImage: "circle.fill")
                     .font(.callout).foregroundStyle(.green)
                     .labelStyle(StatusDotLabelStyle())
             } else if state.busy || isPending {
                 ProgressView().controlSize(.small)
-                Text(isPending ? "В очереди" : state.title)
+                Text(isPending ? L10n.text("profilerowview.queued") : state.title)
                     .font(.callout).foregroundStyle(.secondary).lineLimit(1)
             } else {
                 Button(actionTitle) { model.connectProfile(profile.id) }
@@ -41,10 +42,10 @@ struct ProfileRowView: View {
                     .disabled(!model.canConnectProfile)
             }
             Menu {
-                Button("Настроить…", systemImage: "slider.horizontal.3", action: edit)
+                Button(L10n.text("profilerowview.configure"), systemImage: "slider.horizontal.3", action: edit)
                     .disabled(!model.canManageProfiles)
                 Divider()
-                Button("Удалить…", systemImage: "trash", role: .destructive, action: delete)
+                Button(L10n.text("profilerowview.delete"), systemImage: "trash", role: .destructive, action: delete)
                     .disabled(!canDelete)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 17, weight: .semibold))
@@ -53,8 +54,8 @@ struct ProfileRowView: View {
                     .background(.quaternary.opacity(0.6), in: Circle()).contentShape(Circle())
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .help("Действия с подключением «\(profile.name)»")
-            .accessibilityLabel("Действия с подключением \(profile.name)")
+            .help(L10n.text("profilerowview.actions_for_connection", [.init(profile.name)]))
+            .accessibilityLabel(L10n.text("profilerowview.actions_for_connection_229", [.init(profile.name)]))
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .background(state == .connected ? Color.accentColor.opacity(0.09) : .clear,
@@ -65,15 +66,15 @@ struct ProfileRowView: View {
             }
         }
         .contextMenu {
-            Button("Настроить…", action: edit).disabled(!model.canManageProfiles)
-            Button("Удалить…", role: .destructive, action: delete).disabled(!canDelete)
+            Button(L10n.text("profilerowview.configure"), action: edit).disabled(!model.canManageProfiles)
+            Button(L10n.text("profilerowview.delete"), role: .destructive, action: delete).disabled(!canDelete)
         }
         .accessibilityElement(children: .contain)
     }
 
     private var actionTitle: String {
-        if state == .failed { return "Повторить" }
-        return model.connection.state == .connected ? "Переключиться" : "Подключить"
+        if state == .failed { return L10n.text("profilerowview.retry") }
+        return model.connection.state == .connected ? L10n.text("profilerowview.switch") : L10n.text("action.connect")
     }
 }
 

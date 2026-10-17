@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 
 /// Only TunnelDeck's generated loopback bridge settings reach the root-run engine.
@@ -13,7 +14,7 @@ public struct SocksTunnelConfiguration {
 
     public init(interface: String, socksPort: UInt16) throws {
         guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil,
-              socksPort != 0 else { throw VPNError("Некорректные параметры локального TUN-моста.") }
+              socksPort != 0 else { throw VPNError(L10n.message("sockstunnelconfiguration.invalid_local_tun_bridge_settings")) }
         self.interface = interface
         self.socksPort = socksPort
     }

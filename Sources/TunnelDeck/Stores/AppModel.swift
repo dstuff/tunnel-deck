@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Observation
 import AppKit
@@ -10,13 +11,15 @@ import TunnelCore
     var secrets = ProfileSecrets() { didSet { scheduleAutosave() } }
     var routing = RoutingPolicy() { didSet { scheduleAutosave() } }
     private(set) var savedRouting = RoutingPolicy()
-    var notice: String?
-    private(set) var persistenceError: String?
+    private var noticeContent: LocalizedMessage?
+    var notice: String? { noticeContent?.resolve() }
+    private var persistenceErrorContent: LocalizedMessage?
+    var persistenceError: String? { persistenceErrorContent?.resolve() }
     let connection: ConnectionController
     let switcher: ProfileSwitcher
     private var inMemorySecrets: [UUID: ProfileSecrets] = [:]
     private let profileStore: any ProfileStorage
-    private var loadError: String?
+    private var loadError: LocalizedMessage?
     private var isLoading = true
     @ObservationIgnored private var autosave: Task<Void, Never>?
 
@@ -43,8 +46,8 @@ import TunnelCore
         do { loadedDocument = try profileStore.load() }
         catch {
             loadedDocument = nil
-            loadError = error.localizedDescription
-            persistenceError = error.localizedDescription
+            loadError = error.localizedMessage
+            persistenceErrorContent = error.localizedMessage
         }
         let document = loadedDocument ?? .init()
         profiles = document.profiles
@@ -69,7 +72,7 @@ import TunnelCore
             try? FileManager.default.removeItem(at: url)
         }
         if loadError == nil, loadedDocument == nil, profiles.isEmpty {
-            profiles = [VPNProfile(name: "Мой ocserv")]
+            profiles = [VPNProfile(name: L10n.text("profile.initial_name"))]
         }
         let selected = document.selectedProfile.flatMap { id in profiles.first(where: { $0.id == id })?.id }
         select(selected ?? profiles.first?.id)
@@ -89,13 +92,13 @@ import TunnelCore
         connection.resetProfileResult()
         secrets = inMemorySecrets[id] ?? ProfileSecrets()
         if let serverInput = secrets.serverInput { draft.server = serverInput }
-        notice = nil
+        noticeContent = nil
         isLoading = wasLoading
     }
     func add(_ kind: VPNProtocol) {
         guard canManageProfiles else { return }
         guard save(showNotice: false) else { return }
-        let profile = VPNProfile(name: kind == .openConnect ? "Новый ocserv" : kind.title, kind: kind)
+        let profile = VPNProfile(name: kind == .openConnect ? L10n.text("profile.new_ocserv") : kind.title, kind: kind)
         var updatedSecrets = inMemorySecrets
         updatedSecrets[profile.id] = ProfileSecrets()
         guard persist(profiles + [profile], secrets: updatedSecrets, selected: profile.id) else { return }
@@ -111,7 +114,7 @@ import TunnelCore
     }
     private func persist(_ updatedProfiles: [VPNProfile], secrets updatedSecrets: [UUID: ProfileSecrets],
                          selected: UUID?) -> Bool {
-        guard loadError == nil else { persistenceError = loadError; return false }
+        guard loadError == nil else { persistenceErrorContent = loadError; return false }
         var storedSecrets: [String: ProfileSecrets] = [:]
         var retainedSecrets: [UUID: ProfileSecrets] = [:]
         for profile in updatedProfiles {
@@ -124,11 +127,11 @@ import TunnelCore
                                         secrets: storedSecrets, routing: routing))
             profiles = updatedProfiles
             inMemorySecrets = retainedSecrets
-            persistenceError = nil
+            persistenceErrorContent = nil
             savedRouting = routing
             return true
         } catch {
-            persistenceError = "Не удалось сохранить настройки: \(error.localizedDescription)"
+            persistenceErrorContent = L10n.message("appmodel.could_not_save_settings", [.init(error.localizedMessage)])
             return false
         }
     }
@@ -141,7 +144,7 @@ import TunnelCore
             draft = VPNProfile()
             secrets = ProfileSecrets()
             connection.resetProfileResult()
-            notice = nil
+            noticeContent = nil
         }
         isLoading = false
     }
@@ -168,7 +171,7 @@ import TunnelCore
         var updatedSecrets = inMemorySecrets
         updatedSecrets[profile.id] = savedSecrets
         guard persist(updatedProfiles, secrets: updatedSecrets, selected: profile.id) else { return false }
-        if showNotice { notice = "Профиль сохранён локально." }
+        if showNotice { noticeContent = L10n.message("appmodel.the_profile_was_saved_locally") }
         return true
     }
     func deleteSelected() {
@@ -186,14 +189,14 @@ import TunnelCore
         guard hasSelectedProfile else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
-        panel.title = draft.kind == .amneziaWG ? "Выберите конфигурацию AmneziaWG" : "Выберите конфигурацию Xray"
+        panel.title = draft.kind == .amneziaWG ? L10n.text("appmodel.choose_an_amneziawg_configuration") : L10n.text("appmodel.choose_an_xray_configuration")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) < 256_000 else { throw VPNError("Файл слишком большой.") }
+            guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) < 256_000 else { throw VPNError(L10n.message("appmodel.the_file_is_too_large")) }
             secrets.configuration = try String(contentsOf: url, encoding: .utf8)
             if draft.kind == .xray, let name = try? XrayConfiguration(secrets.configuration).displayName, !name.isEmpty { draft.name = name }
-            notice = "Конфигурация загружена. Нажмите «Проверить»."
-        } catch { notice = error.localizedDescription }
+            noticeContent = L10n.message("appmodel.configuration_loaded_click_check")
+        } catch { noticeContent = error.localizedMessage }
     }
     var canManageProfiles: Bool { loadError == nil && !connection.state.busy && !switcher.isSwitching }
     var hasSelectedProfile: Bool {
@@ -239,7 +242,7 @@ import TunnelCore
         return (try? routing.validated()) != active
     }
     var canApplyRouting: Bool {
-        routingError == nil && persistenceError == nil && connection.state == .connected && !switcher.isSwitching && routingPending
+        routingError == nil && persistenceErrorContent == nil && connection.state == .connected && !switcher.isSwitching && routingPending
     }
     func applyRouting() {
         guard canApplyRouting, let active = connection.activeProfile, save(showNotice: false) else { return }
@@ -272,7 +275,7 @@ import TunnelCore
         updatedSecrets[profile.id] = newSecrets
         guard persist(profiles + [profile], secrets: updatedSecrets, selected: profile.id) else { return false }
         activate(profile.id)
-        notice = "Подключение добавлено и сохранено локально."
+        noticeContent = L10n.message("appmodel.the_connection_was_added_and_saved_locally")
         return true
     }
 }

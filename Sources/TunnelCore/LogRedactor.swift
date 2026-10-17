@@ -1,4 +1,6 @@
+import TunnelLocalization
 import Foundation
+import TunnelLocalization
 
 public struct LogRedactor: Sendable {
     private var secrets: [String]
@@ -35,16 +37,19 @@ public struct LogRedactor: Sendable {
     }
     public func redact(_ text: String) -> String {
         var result = text
-        for secret in secrets { result = result.replacingOccurrences(of: secret, with: "<скрыто>") }
+        for secret in secrets { result = result.replacingOccurrences(of: secret, with: "<redacted>") }
         for (pattern, replacement) in [
-            (#"(?i)(https?://[^\s?\"']+)\?[^\s\"']*"#, "$1?<скрыто>"),
-            (#"(?i)(?:vless|vmess|trojan|ss)://[^\s]+"#, "<ссылка скрыта>"),
-            (#"(?i)((?:cookie|authorization|privatekey|presharedkey|headerprotectionkey|password)\s*[:=]\s*)[^\r\n]+"#, "$1<скрыто>")
+            (#"(?i)(https?://[^\s?\"']+)\?[^\s\"']*"#, "$1?<redacted>"),
+            (#"(?i)(?:vless|vmess|trojan|ss)://[^\s]+"#, "<redacted URI>"),
+            (#"(?i)((?:cookie|authorization|privatekey|presharedkey|headerprotectionkey|password)\s*[:=]\s*)[^\r\n]+"#, "$1<redacted>")
         ] {
             if let regex = try? NSRegularExpression(pattern: pattern) {
                 result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: replacement)
             }
         }
         return result
+    }
+    public func redact(_ message: LocalizedMessage) -> LocalizedMessage {
+        message.mapText { redact($0) }
     }
 }

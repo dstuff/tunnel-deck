@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import SystemConfiguration
@@ -6,13 +7,13 @@ import TunnelCore
 @MainActor enum XrayProbe {
     /// Exercise the actual outbound without installing TUN routes or changing DNS.
     static func check(configuration: XrayConfiguration, runtime: RuntimePaths, selectedOutbound: String? = nil,
-                      log: @escaping (String) -> Void) async throws {
+                      log: @escaping (LocalizedMessage) -> Void) async throws {
         let session = try PrivateSession()
         defer { session.remove() }
         let port = try LoopbackPort.available()
         let file = session.directory.appendingPathComponent("xray-probe.json")
         if configuration.usesVisionCompatibilityTLS {
-            log("REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.")
+            log(L10n.message("xrayprobe.reality_vision_using_the_tunneldeck_compatibility_tls_profile"))
         }
         let store = SCDynamicStoreCreate(nil, "TunnelDeck-probe" as CFString, nil, nil)
         let primary = store.flatMap { SCDynamicStoreCopyValue($0, "State:/Network/Global/IPv4" as CFString) as? [String: Any] }
@@ -28,16 +29,16 @@ import TunnelCore
                 if listening(port) { break }
                 try await Task.sleep(for: .milliseconds(100))
             }
-            guard listening(port) else { throw VPNError("Xray не открыл локальный порт проверки. См. журнал.") }
+            guard listening(port) else { throw VPNError(L10n.message("xrayprobe.xray_did_not_open_the_local_test_port_see")) }
             let curl = ProcessRunner()
             let response = try await curl.run("/usr/bin/curl", ["--disable", "--silent", "--show-error", "--fail",
                 "--proxy", "socks5h://127.0.0.1:\(port)", "--noproxy", "", "--connect-timeout", "10",
                 "--max-time", "20", "--output", "/dev/null", "https://example.com/"], timeout: 25)
             guard response.status == 0 else {
-                log(response.stderr)
-                throw VPNError("Xray: не удалось передать HTTPS через сервер. Проверьте доступность сервера и настройки исходящего подключения; подробности в журнале.")
+                log(.verbatim(response.stderr))
+                throw VPNError(L10n.message("xrayprobe.xray_could_not_transfer_https_through_the_server_check"))
             }
-            log("Xray: одиночный HTTPS-запрос прошёл. Проверяем 8 одновременных запросов…")
+            log(L10n.message("xrayprobe.xray_a_single_https_request_succeeded_checking_8_concurrent"))
             let successes = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
                 for _ in 0..<8 {
                     group.addTask { @MainActor in
@@ -52,8 +53,8 @@ import TunnelCore
                 for await success in group { if success { count += 1 } }
                 return count
             }
-            log("Xray: одновременные HTTPS-запросы без TUN: \(successes)/8.")
-            guard successes == 8 else { throw VPNError("Xray: одиночный запрос проходит, но параллельные соединения нестабильны (\(successes)/8). Системные маршруты в этой проверке не менялись.") }
+            log(L10n.message("xrayprobe.xray_concurrent_https_requests_without_tun_8", [.init(successes)]))
+            guard successes == 8 else { throw VPNError(L10n.message("xrayprobe.xray_a_single_request_succeeds_but_concurrent_connections_are", [.init(successes)])) }
         } catch {
             task.cancel(); engine.cancel()
             _ = await task.result

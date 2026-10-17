@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 
 /// One compiler and one ordered rule list for all transports. No user engine JSON is merged into routing.
@@ -14,9 +15,9 @@ public enum RoutingConfiguration {
                             selectedOutbound: String? = nil, resolvedHosts: [String: String] = [:], systemProbePort: UInt16? = nil) throws -> Data {
         let policy = try input.validated()
         let ports = [trafficPort, probePort, dnsPort] + (systemProbePort.map { [$0] } ?? [])
-        guard !ports.contains(0), Set(ports).count == ports.count else { throw VPNError("Некорректные локальные порты маршрутизатора.") }
+        guard !ports.contains(0), Set(ports).count == ports.count else { throw VPNError(L10n.message("routingconfiguration.invalid_local_router_ports")) }
         func checkInterface(_ name: String) throws {
-            guard name.range(of: #"\A[a-zA-Z][a-zA-Z0-9]{0,19}\z"#, options: .regularExpression) != nil else { throw VPNError("Некорректный сетевой интерфейс.") }
+            guard name.range(of: #"\A[a-zA-Z][a-zA-Z0-9]{0,19}\z"#, options: .regularExpression) != nil else { throw VPNError(L10n.message("routingconfiguration.invalid_network_interface")) }
         }
         try checkInterface(physicalInterface)
         func freedom(_ tag: String, _ interface: String, strategy: String = "UseIP") -> [String: Any] {
@@ -39,7 +40,7 @@ public enum RoutingConfiguration {
             outbounds = [freedom("td-vpn", vpnInterface, strategy: strategy)]
         }
         else if let xray { outbounds = try xray.routedOutbounds(selected: selectedOutbound, physicalInterface: physicalInterface, resolvedHosts: resolvedHosts) }
-        else { throw VPNError("Для маршрутизации не задан VPN-канал.") }
+        else { throw VPNError(L10n.message("routingconfiguration.no_vpn_channel_is_configured_for_routing")) }
         let remoteResolvers = vpnDNS.filter { IPNetwork.address($0) != nil }
         let localResolvers = directDNS.filter { IPNetwork.address($0) != nil && $0 != resolverAddress }
         let remote = remoteResolvers.isEmpty ? ["1.1.1.1", "8.8.8.8"] : remoteResolvers

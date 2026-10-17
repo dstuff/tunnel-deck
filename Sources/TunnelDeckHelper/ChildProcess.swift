@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import TunnelCore
@@ -22,7 +23,9 @@ func tool(_ executable: String, _ arguments: [String], input: Data? = nil,
     let data = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit(); watchdog.cancel()
     let text = String(decoding: data, as: UTF8.self)
-    if process.terminationStatus != 0 && !allowFailure { throw VPNError(text.isEmpty ? "Сетевая команда завершилась с ошибкой." : text) }
+    if process.terminationStatus != 0 && !allowFailure {
+        throw VPNError(text.isEmpty ? L10n.message("childprocess.a_network_command_failed") : .verbatim(text))
+    }
     return text
 }
 

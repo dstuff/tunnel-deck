@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Observation
 import Darwin
@@ -6,11 +7,13 @@ import TunnelCore
 @MainActor @Observable final class ConnectionController {
     private(set) var state: ConnectionState = .idle
     private(set) var logs: [LogEntry] = []
-    private(set) var errorMessage: String?
+    private var errorMessageContent: LocalizedMessage?
+    var errorMessage: String? { errorMessageContent?.resolve() }
     private(set) var connectedAt: Date?
     private(set) var activeProfile: UUID?
     private(set) var statusProfile: UUID?
-    private(set) var checkResult: String?
+    private var checkResultContent: LocalizedMessage?
+    var checkResult: String? { checkResultContent?.resolve() }
     private(set) var activeRouting: RoutingPolicy?
     private(set) var routingRuntime: RoutingRuntimeInfo?
     private let process = ProcessRunner()
@@ -40,13 +43,16 @@ import TunnelCore
     }
 
     func append(_ message: String) {
-        logs.append(LogEntry(redactor.redact(message)))
+        append(.verbatim(message))
+    }
+    func append(_ message: LocalizedMessage, date: Date = Date()) {
+        logs.append(LogEntry(redactor.redact(message), date: date))
         if logs.count > 1200 { logs.removeFirst(logs.count - 1200) }
     }
     func clearLog() { logs.removeAll() }
     func resetProfileResult() {
         guard !locked else { return }
-        checkResult = nil; errorMessage = nil; state = .idle; statusProfile = nil
+        checkResultContent = nil; errorMessageContent = nil; state = .idle; statusProfile = nil
     }
     var exportedLog: String { logs.map { "\($0.date.formatted(date: .omitted, time: .standard))  \($0.message)" }.joined(separator: "\n") }
     private func configureRedaction(profile: VPNProfile, secrets: ProfileSecrets, cookie: String = "") {
@@ -58,12 +64,12 @@ import TunnelCore
         #if DEBUG
         if isDesignPreview {
             statusProfile = profile.id
-            checkResult = "Предпросмотр интерфейса: сетевые проверки не выполнялись."
+            checkResultContent = L10n.message("connectioncontroller.interface_preview_no_network_checks_were_performed")
             return
         }
         #endif
         statusProfile = profile.id
-        state = .checking; errorMessage = nil; checkResult = nil
+        state = .checking; errorMessageContent = nil; checkResultContent = nil
         configureRedaction(profile: profile, secrets: secrets)
         operation = Task {
             defer { operation = nil }
@@ -78,17 +84,19 @@ import TunnelCore
                     let config = URLSessionConfiguration.ephemeral; config.connectionProxyDictionary = [:]
                     let client = URLSession(configuration: config); defer { client.invalidateAndCancel() }
                     let (data, response) = try await client.data(for: request)
-                    guard let http = response as? HTTPURLResponse else { throw VPNError("Сервер не вернул HTTP-ответ.") }
-                    if [401, 404].contains(http.statusCode) { throw VPNError("HTTP \(http.statusCode): сервер не пропустил запрос. Проверьте camouflage-секрет и путь URL.") }
-                    guard http.statusCode == 200 else { throw VPNError("Сервер ответил HTTP \(http.statusCode).") }
+                    guard let http = response as? HTTPURLResponse else { throw VPNError(L10n.message("connectioncontroller.the_server_did_not_return_an_http_response")) }
+                    if [401, 404].contains(http.statusCode) { throw VPNError(L10n.message("connectioncontroller.http_the_server_rejected_the_request_check_the_camouflage", [.init(http.statusCode)])) }
+                    guard http.statusCode == 200 else { throw VPNError(L10n.message("connectioncontroller.the_server_returned_http", [.init(http.statusCode)])) }
                     let body = String(decoding: data.prefix(64_000), as: UTF8.self)
                     guard body.contains("config-auth") || body.contains("<auth") || body.localizedCaseInsensitiveContains("AnyConnect") else {
-                        throw VPNError("TLS и HTTP работают, но ответ не похож на форму ocserv. Для проверки авторизации используйте «Подключить».")
+                        throw VPNError(L10n.message("connectioncontroller.tls_and_http_work_but_the_response_does_not"))
                     }
-                    checkResult = "Сертификат действителен. Сервер ocserv вернул форму входа."
+                    checkResultContent = L10n.message("connectioncontroller.the_certificate_is_valid_the_ocserv_server_returned_a")
                 case .amneziaWG:
                     let config = try AmneziaConfiguration(secrets.configuration)
-                    checkResult = "Конфигурация AWG 3.1 прочитана. Адресов: \(config.addresses.count), серверов: \(config.endpointHosts.count). Handshake проверяется при подключении."
+                    checkResultContent = L10n.message("connectioncontroller.the_awg_3_1_configuration_was_read_addresses_servers", [
+                        .init(L10n.message("awg.address_count", [.init(config.addresses.count)])),
+                        .init(L10n.message("awg.server_count", [.init(config.endpointHosts.count)]))])
                 case .xray:
                     let config = try XrayConfiguration(secrets.configuration)
                     let session = try PrivateSession(); defer { session.remove() }
@@ -96,16 +104,16 @@ import TunnelCore
                     try PrivateSession.write(config.selectedProbeData(port: 1, selected: profile.xrayOutboundTag), to: file)
                     let output = try await process.run(runtime.xray, ["run", "-test", "-config", file.path])
                     guard output.status == 0 else { throw VPNError(redactor.redact(output.stderr + output.stdout)) }
-                    append("Xray принял конфигурацию. Проверяем HTTPS через сервер без изменения маршрутов…")
+                    append(L10n.message("connectioncontroller.xray_accepted_the_configuration_checking_https_through_the_server"))
                     let logRedactor = redactor
                     try await XrayProbe.check(configuration: config, runtime: runtime, selectedOutbound: profile.xrayOutboundTag) { [weak self] line in
                         let safe = logRedactor.redact(line)
                         Task { @MainActor in self?.append(safe) }
                     }
-                    checkResult = "Xray: HTTPS через сервер работает. Системный туннель проверяется при подключении."
+                    checkResultContent = L10n.message("connectioncontroller.xray_https_through_the_server_works_the_system_tunnel")
                 }
                 try Task.checkCancellation()
-                append(checkResult ?? "Проверка завершена."); state = .idle
+                append(checkResultContent ?? L10n.message("connectioncontroller.check_complete")); state = .idle
             } catch {
                 if Task.isCancelled { state = .idle } else { fail(error) }
             }
@@ -121,7 +129,7 @@ import TunnelCore
         }
         #endif
         activeProfile = profile.id; statusProfile = profile.id; kind = profile.kind; receivedConnected = false
-        errorMessage = nil; checkResult = nil; connectedAt = nil
+        errorMessageContent = nil; checkResultContent = nil; connectedAt = nil
         activeRouting = nil; routingRuntime = nil
         configureRedaction(profile: profile, secrets: secrets)
         state = profile.kind == .openConnect ? .authorizing : .checking
@@ -134,23 +142,23 @@ import TunnelCore
                 var request = TunnelRequest(userID: getuid(), parentPID: getpid(), profile: profile, secrets: secrets, routing: policy)
                 switch profile.kind {
                 case .openConnect:
-                    guard !secrets.password.isEmpty else { throw VPNError("Введите пароль VPN-пользователя.") }
+                    guard !secrets.password.isEmpty else { throw VPNError(L10n.message("connectioncontroller.enter_the_vpn_user_password")) }
                     let session = try PrivateSession(); defer { session.remove() }
                     let config = try OpenConnectConfiguration.make(profile: profile, secrets: secrets)
                     let file = session.directory.appendingPathComponent("auth.conf")
                     try PrivateSession.write(Data(config.utf8), to: file)
-                    append("OpenConnect: отправляем начальный URL с camouflage, проверка сертификата включена.")
+                    append(L10n.message("connectioncontroller.openconnect_sending_the_initial_url_with_camouflage_certificate_verification"))
                     let logRedactor = redactor
                     let output = try await process.run(runtime.openconnect!, ["--config", file.path, "--cookieonly", "--passwd-on-stdin"], input: secrets.password) { [weak self] line in
                         let safe = logRedactor.redact(line)
                         Task { @MainActor in self?.append(safe) }
                     }
-                    guard output.status == 0 else { throw VPNError("Авторизация OpenConnect не пройдена. Проверьте журнал, логин и пароль.") }
+                    guard output.status == 0 else { throw VPNError(L10n.message("connectioncontroller.openconnect_authentication_failed_check_the_log_username_and_password")) }
                     let cookies = output.stdout.components(separatedBy: .newlines).filter { !$0.isEmpty }
-                    guard cookies.count == 1, cookies[0].utf8.count <= 64_000 else { throw VPNError("OpenConnect не вернул cookie авторизации.") }
+                    guard cookies.count == 1, cookies[0].utf8.count <= 64_000 else { throw VPNError(L10n.message("connectioncontroller.openconnect_did_not_return_an_authentication_cookie")) }
                     request.cookie = cookies[0]; request.secrets.password = ""
                     configureRedaction(profile: profile, secrets: secrets, cookie: request.cookie)
-                    append("Авторизация успешна. Переходим к настройке VPN.")
+                    append(L10n.message("connectioncontroller.authentication_succeeded_configuring_the_vpn"))
                 case .amneziaWG: _ = try AmneziaConfiguration(secrets.configuration)
                 case .xray: _ = try XrayConfiguration(secrets.configuration).selectedOutboundTag(profile.xrayOutboundTag)
                 }
@@ -160,18 +168,18 @@ import TunnelCore
                 startMonitoring(session)
                 state = .permission
                 let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/TunnelDeckHelper").path
-                guard FileManager.default.isExecutableFile(atPath: helper) else { throw VPNError("В сборке отсутствует модуль настройки сети.") }
+                guard FileManager.default.isExecutableFile(atPath: helper) else { throw VPNError(L10n.message("connectioncontroller.the_app_is_missing_the_network_configuration_helper")) }
                 func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
                 let command = quote(helper) + " --session " + quote(session.directory.path) + " --uid " + String(getuid()) + " >/dev/null 2>&1 &"
                 let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
                 let script = "do shell script \"\(escaped)\" with administrator privileges"
                 let result = try await process.run("/usr/bin/osascript", ["-e", script], timeout: 180)
-                guard result.status == 0 else { throw VPNError("Разрешение macOS на настройку VPN не получено.") }
+                guard result.status == 0 else { throw VPNError(L10n.message("connectioncontroller.macos_permission_to_configure_the_vpn_was_not_granted")) }
                 if state == .permission { state = .configuring }
                 Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .seconds(20))
                     guard let self, self.state == .configuring || self.state == .permission else { return }
-                    self.errorMessage = "Настройка ещё не завершена. Проверьте системный запрос и журнал."
+                    self.errorMessageContent = L10n.message("connectioncontroller.setup_is_still_in_progress_check_the_system_prompt")
                 }
             } catch {
                 if let privateSession { privateSession.stop() }
@@ -189,7 +197,7 @@ import TunnelCore
         }
         #endif
         operation?.cancel(); process.cancel()
-        if let privateSession { state = .disconnecting; privateSession.stop(); append("Завершаем VPN и восстанавливаем сеть…") }
+        if let privateSession { state = .disconnecting; privateSession.stop(); append(L10n.message("connectioncontroller.stopping_the_vpn_and_restoring_the_network")) }
         else { state = operation == nil ? .idle : .disconnecting; activeProfile = nil }
     }
     private func startMonitoring(_ session: PrivateSession) {
@@ -203,7 +211,8 @@ import TunnelCore
         }
     }
     private func receive(_ event: TunnelEvent) {
-        append(event.message)
+        let content = event.localizedMessage ?? .verbatim(event.message)
+        append(content, date: event.timestamp)
         switch event.kind {
         case .log: break
         case .routingReady: routingRuntime = event.routing
@@ -213,7 +222,7 @@ import TunnelCore
         case .connected:
             receivedConnected = true
             if state != .disconnecting { state = .connected; connectedAt = Date(); verifyTraffic() }
-        case .error: errorMessage = redactor.redact(event.message); state = .failed
+        case .error: errorMessageContent = redactor.redact(content); state = .failed
         case .stopped:
             let failed = errorMessage != nil
             finishSession(); state = failed ? .failed : .idle
@@ -225,25 +234,25 @@ import TunnelCore
         trafficCheck = Task { @MainActor in
             defer { if privateSession?.directory == sessionPath { trafficCheck = nil } }
             do {
-                guard let port = routingRuntime?.probePort else { throw VPNError("Маршрутизатор ещё не сообщил диагностический порт.") }
+                guard let port = routingRuntime?.probePort else { throw VPNError(L10n.message("connectioncontroller.the_router_has_not_reported_its_diagnostic_port_yet")) }
                 let result = try await ProcessRunner().run("/usr/bin/curl", ["--disable", "--silent", "--show-error", "--fail",
                     "--proxy", "socks5h://127.0.0.1:\(port)", "--noproxy", "", "--connect-timeout", "5", "--max-time", "15",
                     "--output", "/dev/null", "https://example.com/"])
-                guard result.status == 0 else { throw VPNError("Не получен успешный HTTPS-ответ через VPN.") }
+                guard result.status == 0 else { throw VPNError(L10n.message("connectioncontroller.no_successful_https_response_was_received_through_the_vpn")) }
                 let systemResult = try await ProcessRunner().run("/usr/bin/curl", ["--disable", "--silent", "--show-error", "--fail",
                     "--proxy", "", "--noproxy", "*", "--resolve", "example.com:443:\(RoutingConfiguration.systemProbeAddress)",
                     "--connect-timeout", "5", "--max-time", "15", "--output", "/dev/null", "https://example.com/"])
-                guard systemResult.status == 0 else { throw VPNError("VPN-канал доступен, но передача HTTPS через системный TUN не подтверждена.") }
+                guard systemResult.status == 0 else { throw VPNError(L10n.message("connectioncontroller.the_vpn_channel_is_available_but_https_transfer_through")) }
                 guard !Task.isCancelled, privateSession?.directory == sessionPath,
                       state == .waiting || state == .connected else { return }
-                append("Проверка данных: HTTPS прошёл через системный TUN и VPN-канал независимо от пользовательских правил.")
+                append(L10n.message("connectioncontroller.data_check_https_passed_through_the_system_tun_and"))
                 if kind == .xray && state == .waiting { state = .connected; connectedAt = Date(); receivedConnected = true }
             } catch {
                 if !Task.isCancelled, privateSession?.directory == sessionPath,
                    state == .waiting || state == .connected {
-                    append("Проверка данных: HTTPS example.com недоступен: \(error.localizedDescription)")
+                    append(L10n.message("connectioncontroller.data_check_https_example_com_is_unavailable", [.init(error.localizedMessage)]))
                     if kind == .xray && state == .waiting {
-                        errorMessage = "Передача данных через Xray не подтверждена. Сеть восстанавливается; подробности в журнале."
+                        errorMessageContent = L10n.message("connectioncontroller.data_transfer_through_xray_has_not_been_confirmed_the")
                         state = .failed
                         session.stop()
                     }
@@ -259,7 +268,7 @@ import TunnelCore
         activeRouting = nil; routingRuntime = nil
     }
     private func fail(_ error: Error) {
-        let message = redactor.redact(error.localizedDescription)
-        errorMessage = message; state = .failed; append(message)
+        let message = redactor.redact(error.localizedMessage)
+        errorMessageContent = message; state = .failed; append(message)
     }
 }

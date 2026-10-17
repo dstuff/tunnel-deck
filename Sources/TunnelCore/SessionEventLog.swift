@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 
@@ -32,7 +33,7 @@ public enum SessionEventLog {
         private var needsRotation = false
 
         public init(fileDescriptor: Int32, maximumBytes: Int = SessionEventLog.maximumBytes) throws {
-            guard maximumBytes >= 4096 else { throw VPNError("Недопустимый размер журнала.") }
+            guard maximumBytes >= 4096 else { throw VPNError(L10n.message("sessioneventlog.invalid_log_size")) }
             descriptor = fileDescriptor
             limit = maximumBytes
             // Six state kinds, one new record and a header always fit together.
@@ -54,9 +55,16 @@ public enum SessionEventLog {
             var bounded = event
             if bounded.message.utf8.count > recordLimit {
                 bounded.message = String(decoding: bounded.message.utf8.prefix(recordLimit), as: UTF8.self)
+                bounded.localizedMessage = nil
             }
             let next = sequence + 1
             var bytes = try JSONEncoder().encode(Record(sequence: next, event: bounded))
+            if bytes.count + 1 > recordLimit, bounded.localizedMessage != nil {
+                // The fallback remains readable; oversized arguments cannot escape
+                // the byte limit or be resurrected by a subsequent language change.
+                bounded.localizedMessage = nil
+                bytes = try JSONEncoder().encode(Record(sequence: next, event: bounded))
+            }
             // JSON escaping also counts toward the byte limit, including for a
             // single unusually long engine line. Redaction happens before here.
             while bytes.count + 1 > recordLimit {

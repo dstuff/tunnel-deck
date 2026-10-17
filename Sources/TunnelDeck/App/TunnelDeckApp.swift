@@ -1,10 +1,17 @@
+import TunnelLocalization
 import SwiftUI
 import AppKit
 import TunnelCore
 
 @main struct TunnelDeckApp: App {
-    @State private var model = AppModel.applicationModel()
+    @State private var model: AppModel
+    @State private var language: LanguageSettings
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    init() {
+        let language = LanguageSettings.shared
+        _language = State(initialValue: language)
+        _model = State(initialValue: AppModel.applicationModel())
+    }
     var body: some Scene {
         WindowGroup("TunnelDeck", id: "connections") {
             ContentView(model: model)
@@ -13,29 +20,36 @@ import TunnelCore
         }
         .defaultSize(width: 780, height: 630)
         .commands { ConnectionCommands(model: model) }
-        Window("Настройки подключения", id: "profile-editor") {
+        Window(L10n.text("window.profile_editor"), id: "profile-editor") {
             ProfileEditor(model: model)
+                .localizedWindowTitle(L10n.text("window.profile_editor"))
                 .tint(.blue)
         }
         .defaultSize(width: 640, height: 620)
         .windowResizability(.contentMinSize)
-        Window("Новое подключение", id: "add-connection") {
+        Window(L10n.text("connection.new"), id: "add-connection") {
             AddConnectionView(model: model)
+                .localizedWindowTitle(L10n.text("connection.new"))
                 .tint(.blue)
         }
         .windowResizability(.contentSize)
-        Window("Диагностика", id: "diagnostics") {
+        Window(L10n.text("window.diagnostics"), id: "diagnostics") {
             LogView(connection: model.connection).frame(minWidth: 600, minHeight: 300)
+                .localizedWindowTitle(L10n.text("window.diagnostics"))
         }
         .defaultSize(width: 780, height: 460)
-        Window("Маршрутизация", id: "routing") {
+        Window(L10n.text("window.routing"), id: "routing") {
             RoutingView(model: model)
+                .localizedWindowTitle(L10n.text("window.routing"))
                 .tint(.blue)
                 .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? (CommandLine.arguments.contains("--light-preview") ? .light : .dark) : nil)
         }
         .defaultSize(width: 960, height: 660)
         .windowResizability(.contentMinSize)
-        Settings { SettingsView(connection: model.connection) }
+        Settings {
+            SettingsView(connection: model.connection, language: language)
+                .localizedWindowTitle(L10n.text("window.settings"))
+        }
         MenuBarExtra {
             MenuBarActions(model: model)
         } label: {
@@ -47,15 +61,30 @@ import TunnelCore
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel?
+    private var menuObservers: [NSObjectProtocol] = []
     func applicationDidFinishLaunching(_ notification: Notification) {
         PrivateSession.removeAbandoned()
         NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
+        for name in [Notification.Name.appLanguageDidChange, NSMenu.didBeginTrackingNotification] {
+            menuObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { MenuLocalization.refresh() }
+                DispatchQueue.main.async { MenuLocalization.refresh() }
+                RunLoop.main.perform(inModes: [.eventTracking, .common]) {
+                    MainActor.assumeIsolated { MenuLocalization.refresh() }
+                }
+            })
+        }
+        DispatchQueue.main.async { MenuLocalization.refresh() }
+    }
+    func applicationDidBecomeActive(_ notification: Notification) {
+        LanguageSettings.shared.refreshSystemLanguage()
+        MenuLocalization.refresh()
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if let model, !model.save(showNotice: false) {
             let alert = NSAlert()
-            alert.messageText = "Не удалось сохранить настройки"
-            alert.informativeText = model.persistenceError ?? "Проверьте настройки подключения и повторите выход."
+            alert.messageText = L10n.text("tunneldeckapp.could_not_save_settings")
+            alert.informativeText = model.persistenceError ?? L10n.text("tunneldeckapp.check_the_connection_settings_and_try_quitting_again")
             alert.runModal()
             return .terminateCancel
         }
@@ -68,8 +97,8 @@ import TunnelCore
                 try? await Task.sleep(for: .milliseconds(250))
             }
             let alert = NSAlert()
-            alert.messageText = "VPN ещё завершает соединение"
-            alert.informativeText = "Дождитесь восстановления сетевых настроек и повторите выход."
+            alert.messageText = L10n.text("tunneldeckapp.vpn_is_still_disconnecting")
+            alert.informativeText = L10n.text("tunneldeckapp.wait_for_the_network_settings_to_be_restored_then")
             alert.runModal(); NSApp.reply(toApplicationShouldTerminate: false)
         }
         return .terminateLater

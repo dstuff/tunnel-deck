@@ -1,0 +1,2 @@
+"NSAppleEventsUsageDescription" = "Allow TunnelDeck to request macOS permission to configure a VPN connection.";
+"NSHumanReadableCopyright" = "TunnelDeck. Third-party engine licenses are included in Resources/Runtime.";

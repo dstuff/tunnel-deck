@@ -1,9 +1,10 @@
+import TunnelLocalization
 import Foundation
 
 public enum RoutingAction: String, Codable, CaseIterable, Identifiable, Sendable {
     case vpn, direct, block
     public var id: String { rawValue }
-    public var title: String { switch self { case .vpn: return "Через VPN"; case .direct: return "Без VPN"; case .block: return "Блокировать" } }
+    public var title: String { switch self { case .vpn: return L10n.text("routing.action.vpn"); case .direct: return L10n.text("routing.action.direct"); case .block: return L10n.text("routing.action.block") } }
     public var outboundTag: String { "td-" + rawValue }
     public var symbol: String { switch self { case .vpn: return "lock.shield"; case .direct: return "globe"; case .block: return "nosign" } }
 }
@@ -11,7 +12,7 @@ public enum RoutingAction: String, Codable, CaseIterable, Identifiable, Sendable
 public enum RoutingMatchType: String, Codable, CaseIterable, Identifiable, Sendable {
     case domain, domainSuffix, ipCIDR, country
     public var id: String { rawValue }
-    public var title: String { switch self { case .domain: return "Точный домен"; case .domainSuffix: return "Сайт и поддомены"; case .ipCIDR: return "IP или сеть"; case .country: return "Страна IP-адреса" } }
+    public var title: String { switch self { case .domain: return L10n.text("routingpolicy.exact_domain"); case .domainSuffix: return L10n.text("routingpolicy.site_and_subdomains"); case .ipCIDR: return L10n.text("routing.match.network"); case .country: return L10n.text("routing.match.country") } }
     public var symbol: String { switch self { case .domain, .domainSuffix: return "globe"; case .ipCIDR: return "network"; case .country: return "flag" } }
 }
 
@@ -24,13 +25,13 @@ public struct RoutingMatch: Codable, Equatable, Sendable {
 
     public func normalized() throws -> RoutingMatch {
         var value = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard value.utf8.count <= 1024 else { throw VPNError("Условие правила слишком длинное.") }
+        guard value.utf8.count <= 1024 else { throw VPNError(L10n.message("routingpolicy.the_rule_condition_is_too_long")) }
         switch type {
         case .domain, .domainSuffix: value = try Self.domain(value)
         case .ipCIDR: value = try IPNetwork(value).cidr
         case .country:
             value = value.uppercased()
-            guard Self.countryCodes.contains(value) else { throw VPNError("Выберите страну из списка.") }
+            guard Self.countryCodes.contains(value) else { throw VPNError(L10n.message("routingpolicy.choose_a_country_from_the_list")) }
         }
         return .init(type: type, value: value)
     }
@@ -39,25 +40,28 @@ public struct RoutingMatch: Codable, Equatable, Sendable {
         var value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.contains("://") {
             guard let url = URLComponents(string: value), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-                  url.user == nil, url.password == nil, let host = url.host else { throw VPNError("Вставьте домен или HTTP(S)-адрес сайта.") }
+                  url.user == nil, url.password == nil, let host = url.host else { throw VPNError(L10n.message("routingpolicy.paste_a_domain_or_an_http_s_website_address")) }
             value = host
         }
         value = value.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         // Foundation's URL host serialisation normalises internationalised domains to ASCII.
         guard let url = URL(string: "https://" + value + "/"), let host = url.host, IPNetwork.address(host) == nil,
               !value.contains(where: { $0.isWhitespace || "/:@?#*\\".contains($0) }), !value.isEmpty else {
-            throw VPNError("Введите домен сайта, например example.org. Для IP выберите «IP или сеть».")
+            throw VPNError(L10n.message("routingpolicy.enter_a_website_domain_such_as_example_org_for"))
         }
         let labels = host.split(separator: ".", omittingEmptySubsequences: false)
         guard host.utf8.count <= 253, labels.allSatisfy({ label in
             !label.isEmpty && label.utf8.count <= 63 && label.first != "-" && label.last != "-" &&
             label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
-        }) else { throw VPNError("Некорректное имя сайта.") }
+        }) else { throw VPNError(L10n.message("routingpolicy.invalid_website_domain")) }
         return host
     }
 
     public var displayValue: String {
-        type == .country ? Locale(identifier: "ru_RU").localizedString(forRegionCode: value.uppercased()) ?? value : value
+        displayMessage.resolve()
+    }
+    public var displayMessage: LocalizedMessage {
+        type == .country ? L10n.message("routing.country_name", [.region(value.uppercased())]) : .verbatim(value)
     }
 }
 
@@ -84,33 +88,33 @@ public struct RoutingPolicy: Codable, Equatable, Sendable {
     public static let maximumRules = 1000
     public var format = "tunneldeck-routing"
     public var version = 1
-    public var name = "Мои правила"
+    public var name = L10n.text("routing.default_name")
     public var defaultAction: RoutingAction = .vpn
     public var rules: [RoutingRule] = []
     public init() {}
 
     public func validated() throws -> RoutingPolicy {
-        guard format == "tunneldeck-routing", version == 1 else { throw VPNError("Этот формат маршрутизации не поддерживается. Нужен файл TunnelDeck версии 1.") }
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.utf8.count <= 200 else { throw VPNError("Укажите название схемы длиной до 200 байт.") }
-        guard defaultAction != .block else { throw VPNError("Для остального интернета выберите «Через VPN» или «Без VPN».") }
-        guard rules.count <= Self.maximumRules, Set(rules.map(\.id)).count == rules.count else { throw VPNError("Слишком много правил или повторяющиеся идентификаторы.") }
+        guard format == "tunneldeck-routing", version == 1 else { throw VPNError(L10n.message("routingpolicy.this_routing_format_is_not_supported_a_tunneldeck_version")) }
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.utf8.count <= 200 else { throw VPNError(L10n.message("routingpolicy.enter_a_policy_name_of_up_to_200_bytes")) }
+        guard defaultAction != .block else { throw VPNError(L10n.message("routingpolicy.for_all_other_traffic_choose_through_vpn_or_without")) }
+        guard rules.count <= Self.maximumRules, Set(rules.map(\.id)).count == rules.count else { throw VPNError(L10n.message("routingpolicy.too_many_rules_or_duplicate_identifiers")) }
         var policy = self
         for index in rules.indices {
             do { policy.rules[index].match = try rules[index].match.normalized() }
-            catch { throw VPNError("Правило \(index + 1): \(error.localizedDescription)") }
+            catch { throw VPNError(L10n.message("routingpolicy.rule", [.init(index + 1), .init(error.localizedMessage)])) }
         }
-        guard try JSONEncoder().encode(policy).count <= Self.maximumFileSize else { throw VPNError("Схема маршрутизации слишком большая.") }
+        guard try JSONEncoder().encode(policy).count <= Self.maximumFileSize else { throw VPNError(L10n.message("routingpolicy.the_routing_policy_is_too_large")) }
         return policy
     }
 
     public static func importFile(_ data: Data) throws -> RoutingPolicy {
-        guard data.count <= maximumFileSize else { throw VPNError("Файл маршрутизации превышает 128 КБ.") }
+        guard data.count <= maximumFileSize else { throw VPNError(L10n.message("routingpolicy.the_routing_file_exceeds_128_kb")) }
         // A share file is an allowlisted public document, never a profile/engine dump.
         func check(_ object: [String: Any], allowed: Set<String>) throws {
-            guard Set(object.keys).isSubset(of: allowed) else { throw VPNError("В файле есть неподдерживаемые поля. Импорт отменён целиком.") }
+            guard Set(object.keys).isSubset(of: allowed) else { throw VPNError(L10n.message("routingpolicy.the_file_contains_unsupported_fields_nothing_was_imported")) }
         }
         do {
-            guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw VPNError("Нужен JSON-файл маршрутизации TunnelDeck.") }
+            guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw VPNError(L10n.message("routingpolicy.a_tunneldeck_routing_json_file_is_required")) }
             try check(root, allowed: ["format", "version", "name", "defaultAction", "rules"])
             for rule in root["rules"] as? [[String: Any]] ?? [] {
                 try check(rule, allowed: ["id", "match", "action", "enabled"])
@@ -118,13 +122,13 @@ public struct RoutingPolicy: Codable, Equatable, Sendable {
             }
             return try JSONDecoder().decode(RoutingPolicy.self, from: data).validated()
         } catch let error as VPNError { throw error }
-        catch { throw VPNError("Файл маршрутизации повреждён или содержит неподдерживаемые условия и действия.") }
+        catch { throw VPNError(L10n.message("routingpolicy.the_routing_file_is_damaged_or_contains_unsupported_conditions")) }
     }
 
     public func exportFile() throws -> Data {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(validated())
-        guard data.count <= Self.maximumFileSize else { throw VPNError("Файл маршрутизации превышает 128 КБ.") }
+        guard data.count <= Self.maximumFileSize else { throw VPNError(L10n.message("routingpolicy.the_routing_file_exceeds_128_kb")) }
         return data
     }
 

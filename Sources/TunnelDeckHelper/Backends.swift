@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import TunnelCore
@@ -25,7 +26,7 @@ final class BackendRunner {
     }
     func openConnect() throws {
         let request = session.request
-        guard !request.cookie.isEmpty, !request.cookie.contains("\n"), !request.cookie.contains("\r") else { throw VPNError("Отсутствует cookie авторизации OpenConnect.") }
+        guard !request.cookie.isEmpty, !request.cookie.contains("\n"), !request.cookie.contains("\r") else { throw VPNError(L10n.message("backends.the_openconnect_authentication_cookie_is_missing")) }
         let configuration = try OpenConnectConfiguration.make(profile: request.profile, secrets: request.secrets)
         let configURL = scratch.appendingPathComponent("openconnect.conf")
         try PrivateSession.write(Data(configuration.utf8), to: configURL)
@@ -40,7 +41,7 @@ final class BackendRunner {
         let eventFile = scratch.appendingPathComponent("openconnect-network.json")
         var previous: UUID?, deadline = Date().addingTimeInterval(60)
         while !session.stopping() {
-            guard child.process.isRunning else { throw VPNError("OpenConnect завершил соединение. Подробности в журнале.") }
+            guard child.process.isRunning else { throw VPNError(L10n.message("backends.openconnect_disconnected_see_the_log_for_details")) }
             if let data = try? Data(contentsOf: eventFile), data.count <= 64_000,
                let event = try? JSONDecoder().decode(OpenConnectNetworkSettings.self, from: data), event.id != previous {
                 previous = event.id
@@ -54,17 +55,17 @@ final class BackendRunner {
                     try network.excludeFromVPN(event.excludedRoutes, interface: event.interface)
                     router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
                                                 vpnInterface: event.interface, vpnDNS: event.dns, vpnAddresses: event.addresses)
-                    session.emit(.connected, "ocserv: авторизация пройдена, общая маршрутизация настроена.")
+                    session.emit(.connected, L10n.message("backends.ocserv_authenticated_shared_routing_is_configured"))
                     deadline = .distantFuture
                 case "attempt-reconnect":
-                    session.emit(.configuring, "OpenConnect восстанавливает VPN-канал; правила остаются включены…")
+                    session.emit(.configuring, L10n.message("backends.openconnect_is_restoring_the_vpn_channel_rules_remain_active"))
                     deadline = Date().addingTimeInterval(60)
-                case "disconnect": throw VPNError("OpenConnect закрыл VPN-канал.")
+                case "disconnect": throw VPNError(L10n.message("backends.openconnect_closed_the_vpn_channel"))
                 default: break
                 }
             }
             try router?.checkRunning()
-            if Date() > deadline { throw VPNError("Сервер не завершил настройку туннеля за 60 секунд.") }
+            if Date() > deadline { throw VPNError(L10n.message("backends.the_server_did_not_finish_configuring_the_tunnel_within")) }
             usleep(250_000)
         }
     }
@@ -86,10 +87,10 @@ final class BackendRunner {
                 interface = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil { break }
             }
-            guard child.process.isRunning else { throw VPNError("Не удалось создать интерфейс AmneziaWG.") }
+            guard child.process.isRunning else { throw VPNError(L10n.message("backends.could_not_create_the_amneziawg_interface")) }
             usleep(100_000)
         }
-        guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil else { throw VPNError("AmneziaWG не сообщил имя интерфейса.") }
+        guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil else { throw VPNError(L10n.message("backends.amneziawg_did_not_report_an_interface_name")) }
         try tool(runtime.awg, ["setconf", interface, configFile.path], env: env)
         try network.protectEndpoints(config.endpointHosts)
         // AllowedIPs retains peer selection/coverage; Table never disables the shared policy.
@@ -97,10 +98,10 @@ final class BackendRunner {
                               allowedIPs: config.allowedIPs, dns: [], scoped: true)
         router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
                                     vpnInterface: interface, vpnDNS: config.dns, vpnAddresses: config.addresses)
-        session.emit(.networkReady, "AmneziaWG: общая маршрутизация настроена, ожидаем handshake…")
+        session.emit(.networkReady, L10n.message("backends.amneziawg_shared_routing_is_configured_waiting_for_a_handshake"))
         var connected = false; let start = Date(); var lastCheck = Date.distantPast
         while !session.stopping() {
-            guard child.process.isRunning else { throw VPNError("Движок AmneziaWG остановился.") }
+            guard child.process.isRunning else { throw VPNError(L10n.message("backends.the_amneziawg_engine_stopped")) }
             try router?.checkRunning()
             if Date().timeIntervalSince(lastCheck) > 2 {
                 lastCheck = Date()
@@ -109,16 +110,16 @@ final class BackendRunner {
                     guard let last = line.split(whereSeparator: { $0.isWhitespace }).last else { return false }
                     return (Int64(last) ?? 0) > 0
                 }
-                if hasHandshake && !connected { connected = true; session.emit(.connected, "AmneziaWG 3.1: получен handshake сервера.") }
+                if hasHandshake && !connected { connected = true; session.emit(.connected, L10n.message("backends.amneziawg_3_1_received_a_server_handshake")) }
             }
-            if !connected && Date().timeIntervalSince(start) > 45 { throw VPNError("Нет handshake AmneziaWG. Проверьте ключи, параметры маскировки и доступность UDP.") }
+            if !connected && Date().timeIntervalSince(start) > 45 { throw VPNError(L10n.message("backends.no_amneziawg_handshake_check_the_keys_obfuscation_parameters_and")) }
             usleep(250_000)
         }
     }
     func xray() throws {
         let config = try XrayConfiguration(session.request.secrets.configuration)
         _ = try config.selectedOutboundTag(session.request.profile.xrayOutboundTag)
-        if config.usesVisionCompatibilityTLS { session.emit(.log, "REALITY/Vision: используем TLS-профиль совместимости TunnelDeck.") }
+        if config.usesVisionCompatibilityTLS { session.emit(.log, L10n.message("xrayprobe.reality_vision_using_the_tunneldeck_compatibility_tls_profile")) }
         let network = try NetworkConfiguration(session: session)
         var router: RoutingRuntime?
         defer { network.restore(); router?.stop() }
@@ -127,16 +128,16 @@ final class BackendRunner {
         for host in endpointHosts where IPNetwork.address(host) == nil {
             var hints = addrinfo(); hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM
             var result: UnsafeMutablePointer<addrinfo>?
-            guard getaddrinfo(host, nil, &hints, &result) == 0, let entry = result else { throw VPNError("Не удалось определить адрес сервера Xray.") }
+            guard getaddrinfo(host, nil, &hints, &result) == 0, let entry = result else { throw VPNError(L10n.message("backends.could_not_determine_the_xray_server_address")) }
             defer { freeaddrinfo(result) }
             var text = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(entry.pointee.ai_addr, entry.pointee.ai_addrlen, &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0 else { throw VPNError("Не удалось определить IP сервера Xray.") }
+            guard getnameinfo(entry.pointee.ai_addr, entry.pointee.ai_addrlen, &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0 else { throw VPNError(L10n.message("backends.could_not_resolve_the_xray_server_ip_address")) }
             resolved[host] = String(cString: text)
         }
         try network.protectEndpoints(endpointHosts.map { resolved[$0] ?? $0 })
         router = try RoutingRuntime(session: session, runtime: runtime, scratch: scratch, network: network,
                                     xray: config, resolvedHosts: resolved)
-        session.emit(.networkReady, "Xray: общая маршрутизация настроена, проверяем передачу данных через VPN…")
+        session.emit(.networkReady, L10n.message("backends.xray_shared_routing_is_configured_checking_data_transfer_through"))
         while !session.stopping() { try router?.checkRunning(); usleep(250_000) }
     }
     deinit { try? FileManager.default.removeItem(at: scratch) }

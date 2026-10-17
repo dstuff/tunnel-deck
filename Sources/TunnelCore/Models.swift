@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 
 public enum VPNProtocol: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -31,7 +32,7 @@ public struct VPNProfile: Codable, Identifiable, Equatable, Sendable {
     public var disableDTLS: Bool
     public var xrayOutboundTag: String?
 
-    public init(id: UUID = UUID(), name: String = "Новое подключение", kind: VPNProtocol = .openConnect,
+    public init(id: UUID = UUID(), name: String = L10n.text("connection.new"), kind: VPNProtocol = .openConnect,
                 server: String = "", username: String = "", authGroup: String = "",
                 certificatePin: String = "", disableDTLS: Bool = false, xrayOutboundTag: String? = nil) {
         self.id = id; self.name = name; self.kind = kind; self.server = server
@@ -78,14 +79,39 @@ public struct TunnelEvent: Codable, Sendable {
     public var message: String
     public var timestamp: Date
     public var routing: RoutingRuntimeInfo?
+    public var localizedMessage: LocalizedMessage?
     public init(_ kind: Kind, _ message: String, routing: RoutingRuntimeInfo? = nil) {
         self.kind = kind; self.message = message; self.timestamp = Date()
         self.routing = routing
+        self.localizedMessage = nil
+    }
+    public init(_ kind: Kind, _ message: LocalizedMessage, routing: RoutingRuntimeInfo? = nil) {
+        self.init(kind, message.resolve(language: .englishUS), routing: routing)
+        self.localizedMessage = message
+    }
+    private enum CodingKeys: String, CodingKey { case kind, message, timestamp, routing, localizedMessage }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try values.decode(Kind.self, forKey: .kind)
+        message = try values.decode(String.self, forKey: .message)
+        timestamp = try values.decode(Date.self, forKey: .timestamp)
+        routing = try values.decodeIfPresent(RoutingRuntimeInfo.self, forKey: .routing)
+        // An unsupported descriptor must never hide network readiness or cleanup.
+        localizedMessage = try? values.decode(LocalizedMessage.self, forKey: .localizedMessage)
+        if localizedMessage?.fallback == nil { localizedMessage?.fallback = message }
     }
 }
 
 public struct VPNError: LocalizedError, Sendable {
-    public let message: String
-    public init(_ message: String) { self.message = message }
+    public let localizedMessage: LocalizedMessage
+    public var message: String { localizedMessage.resolve() }
+    public init(_ message: String) { localizedMessage = .verbatim(message) }
+    public init(_ message: LocalizedMessage) { localizedMessage = message }
     public var errorDescription: String? { message }
+}
+
+public extension Error {
+    var localizedMessage: LocalizedMessage {
+        (self as? VPNError)?.localizedMessage ?? .verbatim(localizedDescription)
+    }
 }

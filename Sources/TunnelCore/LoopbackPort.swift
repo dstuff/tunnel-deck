@@ -1,10 +1,11 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 
 public enum LoopbackPort {
     public static func available() throws -> UInt16 {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw VPNError("Не удалось открыть локальный сокет проверки.") }
+        guard fd >= 0 else { throw VPNError(L10n.message("loopbackport.could_not_open_a_local_test_socket")) }
         defer { close(fd) }
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -19,7 +20,7 @@ public enum LoopbackPort {
         let result = withUnsafeMutablePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &length) }
         }
-        guard status == 0, result == 0 else { throw VPNError("Не удалось выбрать локальный порт проверки.") }
+        guard status == 0, result == 0 else { throw VPNError(L10n.message("loopbackport.could_not_select_a_local_test_port")) }
         return UInt16(bigEndian: address.sin_port)
     }
 }

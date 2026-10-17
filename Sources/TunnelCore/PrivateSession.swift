@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 
@@ -24,22 +25,22 @@ public final class PrivateSession {
         try Self.write(Data(), to: lease)
         leaseFD = open(lease.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard leaseFD >= 0, flock(leaseFD, LOCK_SH | LOCK_NB) == 0 else {
-            throw VPNError("Не удалось удержать каталог VPN-сеанса.")
+            throw VPNError(L10n.message("privatesession.could_not_retain_the_vpn_session_directory"))
         }
         try Self.write(Data(), to: eventFile)
-        guard mkfifo(controlFile.path, 0o600) == 0 else { throw VPNError("Не удалось создать канал управления VPN.") }
+        guard mkfifo(controlFile.path, 0o600) == 0 else { throw VPNError(L10n.message("privatesession.could_not_create_the_vpn_control_channel")) }
         controlFD = open(controlFile.path, O_RDWR | O_NONBLOCK | O_NOFOLLOW)
-        guard controlFD >= 0 else { throw VPNError("Не удалось открыть канал управления VPN.") }
+        guard controlFD >= 0 else { throw VPNError(L10n.message("privatesession.could_not_open_the_vpn_control_channel")) }
         initialized = true
     }
     public static func write(_ data: Data, to url: URL) throws {
         guard FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-            throw VPNError("Не удалось записать временную конфигурацию.")
+            throw VPNError(L10n.message("privatesession.could_not_write_the_temporary_configuration"))
         }
     }
     public func save(_ request: TunnelRequest) throws {
         let data = try JSONEncoder().encode(request)
-        guard data.count <= 512_000 else { throw VPNError("Профиль вместе с маршрутизацией превышает допустимый размер запроса (512 КБ). Сократите конфигурацию или число правил.") }
+        guard data.count <= 512_000 else { throw VPNError(L10n.message("privatesession.the_profile_and_routing_rules_exceed_the_request_size")) }
         try Self.write(data, to: requestFile)
     }
     public func stop() { if controlFD >= 0 { _ = "stop\n".withCString { Darwin.write(controlFD, $0, 5) } } }

@@ -1,3 +1,4 @@
+import TunnelLocalization
 import XCTest
 import TunnelCore
 @testable import TunnelDeck
@@ -185,7 +186,7 @@ import TunnelCore
         defer { try? FileManager.default.removeItem(at: store.file.deletingLastPathComponent()) }
         XCTAssertNil(try store.load())
         let firstLaunch = AppModel(profileStore: store, arguments: [])
-        XCTAssertEqual(firstLaunch.profiles.map(\.name), ["Мой ocserv"])
+        XCTAssertEqual(firstLaunch.profiles.map(\.name), [L10n.text("profile.initial_name")])
         XCTAssertTrue(firstLaunch.hasSelectedProfile)
 
         // Both the current format and the legacy empty array represent an intentional empty list.

@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import SystemConfiguration
@@ -27,7 +28,7 @@ final class NetworkConfiguration {
         }
         guard let iface = value("interface", in: v4) ?? value("interface", in: v6),
               iface.range(of: #"^[a-zA-Z]+[0-9]+$"#, options: .regularExpression) != nil else {
-            throw VPNError("Не найден активный сетевой интерфейс.")
+            throw VPNError(L10n.message("networkconfiguration.no_active_network_interface_was_found"))
         }
         physicalInterface = iface
         gateway4 = value("gateway", in: v4); gateway6 = value("gateway", in: v6)
@@ -48,7 +49,7 @@ final class NetworkConfiguration {
         for host in Set(hosts) {
             var hints = addrinfo(); hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_DGRAM
             var result: UnsafeMutablePointer<addrinfo>?
-            guard getaddrinfo(host, nil, &hints, &result) == 0 else { throw VPNError("Не удалось определить адрес VPN-сервера.") }
+            guard getaddrinfo(host, nil, &hints, &result) == 0 else { throw VPNError(L10n.message("networkconfiguration.could_not_resolve_the_vpn_server_address")) }
             defer { if let result { freeaddrinfo(result) } }
             var current = result
             while let entry = current {
@@ -68,7 +69,7 @@ final class NetworkConfiguration {
     func configure(interface: String, addresses: [String], mtu: Int, allowedIPs: [String], dns: [String], scoped: Bool = false) throws {
         guard interface.range(of: #"\Autun[0-9]{1,4}\z"#, options: .regularExpression) != nil,
               (576...9000).contains(mtu), addresses.allSatisfy({ AmneziaConfiguration.validCIDR($0) }),
-              allowedIPs.allSatisfy({ AmneziaConfiguration.validCIDR($0) }), dns.allSatisfy({ IPNetwork.address($0) != nil }) else { throw VPNError("Некорректная конфигурация сети.") }
+              allowedIPs.allSatisfy({ AmneziaConfiguration.validCIDR($0) }), dns.allSatisfy({ IPNetwork.address($0) != nil }) else { throw VPNError(L10n.message("networkconfiguration.invalid_network_configuration")) }
         for address in addresses {
             let args = address.contains(":") ? [interface, "inet6", address, "alias"] :
                 [interface, "inet", address, String(address.split(separator: "/")[0]), "alias"]
@@ -80,7 +81,7 @@ final class NetworkConfiguration {
             // IPv4-only profiles can still capture IPv6 with AllowedIPs = ::/0.
             // A link-local address initializes IPv6 without inventing a server-assigned address.
             try tool("/sbin/ifconfig", [interface, "inet6", "fe80::1/64", "alias"])
-            session.emit(.log, "Для IPv6-маршрутов настроен локальный адрес туннеля.")
+            session.emit(.log, L10n.message("networkconfiguration.a_local_tunnel_address_was_configured_for_ipv6_routes"))
         }
         for cidr in Set(allowedIPs) {
             let prefixes = !scoped && cidr == "0.0.0.0/0" ? ["0.0.0.0/1", "128.0.0.0/1"] :
@@ -98,10 +99,10 @@ final class NetworkConfiguration {
             }
         }
         if !dns.isEmpty {
-            guard let store = SCDynamicStoreCreate(nil, "TunnelDeck" as CFString, nil, nil) else { throw VPNError("Не удалось настроить DNS.") }
+            guard let store = SCDynamicStoreCreate(nil, "TunnelDeck" as CFString, nil, nil) else { throw VPNError(L10n.message("networkconfiguration.could_not_configure_dns")) }
             let values: [String: Any] = ["ServerAddresses": dns, "SupplementalMatchDomains": [""],
                                          "SupplementalMatchOrders": [0], "SupplementalMatchDomainsNoSearch": 1]
-            guard SCDynamicStoreAddTemporaryValue(store, dnsKey as CFString, values as CFDictionary) else { throw VPNError("macOS отклонила настройку DNS.") }
+            guard SCDynamicStoreAddTemporaryValue(store, dnsKey as CFString, values as CFDictionary) else { throw VPNError(L10n.message("networkconfiguration.macos_rejected_the_dns_configuration")) }
             dnsStore = store
         }
     }
@@ -123,15 +124,15 @@ final class NetworkConfiguration {
         do { output = try tool("/sbin/route", ["-q", "-n", "add"] + args) }
         catch {
             if tolerateExisting && error.localizedDescription.localizedCaseInsensitiveContains("File exists") { return }
-            throw VPNError("Не удалось установить VPN-маршрут (\(args.joined(separator: " "))): " + error.localizedDescription)
+            throw VPNError(L10n.message("networkconfiguration.could_not_install_the_vpn_route", [.init(args.joined(separator: " ")), .init(error.localizedMessage)]))
         }
         // route prints kernel errors even when its exit status is zero.
         if output.localizedCaseInsensitiveContains("File exists") {
             if tolerateExisting { return }
-            throw VPNError("Нужный маршрут уже используется другим подключением. Отключите его перед запуском TunnelDeck.")
+            throw VPNError(L10n.message("networkconfiguration.the_required_route_is_already_used_by_another_connection"))
         }
         if output.localizedCaseInsensitiveContains("not in table") || output.localizedCaseInsensitiveContains("unreachable") || output.localizedCaseInsensitiveContains("permission") {
-            throw VPNError("Не удалось установить VPN-маршрут (\(args.joined(separator: " "))): " + output.trimmingCharacters(in: .whitespacesAndNewlines))
+            throw VPNError(L10n.message("networkconfiguration.could_not_install_the_vpn_route", [.init(args.joined(separator: " ")), .init(output.trimmingCharacters(in: .whitespacesAndNewlines))]))
         }
         routes.append(args)
     }

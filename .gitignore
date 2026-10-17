@@ -9,3 +9,4 @@ Runtime/geoip/
 *.log
 .DS_Store
 .private/
+__pycache__/

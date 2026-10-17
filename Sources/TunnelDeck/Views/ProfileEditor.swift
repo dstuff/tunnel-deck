@@ -1,3 +1,4 @@
+import TunnelLocalization
 import SwiftUI
 import TunnelCore
 
@@ -10,8 +11,8 @@ struct ProfileEditor: View {
             if model.hasSelectedProfile {
                 editor
             } else {
-                ContentUnavailableView("Нет выбранного подключения", systemImage: "network",
-                                       description: Text("Добавьте подключение в главном окне TunnelDeck."))
+                ContentUnavailableView(L10n.text("profileeditor.no_connection_selected"), systemImage: "network",
+                                       description: Text(L10n.text("profileeditor.add_a_connection_in_the_main_tunneldeck_window")))
             }
         }
         .frame(minWidth: 600, minHeight: 580)
@@ -43,18 +44,18 @@ struct ProfileEditor: View {
 
             Form {
                 Section {
-                    TextField("Название", text: $model.draft.name)
+                    TextField(L10n.text("addconnectionview.name"), text: $model.draft.name)
                     if model.draft.kind == .openConnect {
-                        TextField("Адрес сервера", text: $model.openConnectAddress, prompt: Text("https://vpn.example.com:443/?секрет"))
+                        TextField(L10n.text("profileeditor.server_address"), text: $model.openConnectAddress, prompt: Text(L10n.text("profileeditor.https_vpn_example_com_443_secret")))
                             .autocorrectionDisabled()
-                            .help("Полный HTTPS-адрес вместе с ? и camouflage-секретом, если он используется.")
-                        TextField("Пользователь", text: $model.draft.username).autocorrectionDisabled()
-                        SecureField("Пароль", text: $model.secrets.password)
+                            .help(L10n.text("profileeditor.the_full_https_address_including_and_the_camouflage_secret"))
+                        TextField(L10n.text("addconnectionview.username"), text: $model.draft.username).autocorrectionDisabled()
+                        SecureField(L10n.text("addconnectionview.password"), text: $model.secrets.password)
                     } else {
                         HStack {
-                            Text(model.draft.kind == .amneziaWG ? "Конфигурация .conf" : "JSON или ссылка VLESS / Trojan")
+                            Text(model.draft.kind == .amneziaWG ? L10n.text("profileeditor.conf_configuration") : L10n.text("profileeditor.json_or_vless_trojan_link"))
                             Spacer()
-                            Button("Открыть файл…", systemImage: "doc.badge.plus") { model.importConfiguration() }
+                            Button(L10n.text("profileeditor.open_file"), systemImage: "doc.badge.plus") { model.importConfiguration() }
                         }
                         TextEditor(text: $model.secrets.configuration)
                             .font(.system(.caption, design: .monospaced))
@@ -63,21 +64,21 @@ struct ProfileEditor: View {
                             .padding(6).background(.background, in: RoundedRectangle(cornerRadius: 6))
                             .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.6)))
                         if model.draft.kind == .xray, let config = try? XrayConfiguration(model.secrets.configuration), config.outboundChoices.count > 1 {
-                            Picker("Основной сервер", selection: $model.draft.xrayOutboundTag) {
-                                Text("Выберите сервер").tag(nil as String?)
+                            Picker(L10n.text("profileeditor.primary_server"), selection: $model.draft.xrayOutboundTag) {
+                                Text(L10n.text("profileeditor.choose_a_server")).tag(nil as String?)
                                 ForEach(config.outboundChoices) { choice in Text(choice.title).tag(choice.tag as String?) }
                             }
                         }
-                        Text(model.draft.kind == .amneziaWG ? "Параметры AWG 3.1 сохраняются целиком. AllowedIPs определяет доступные через сервер сети; общие правила задаются в «Маршрутизации»." : "Исходный JSON сохраняется. При подключении routing, dns и входящие заменяются общей схемой TunnelDeck; выбранный сервер и его цепочка используются для действия «Через VPN».")
+                        Text(model.draft.kind == .amneziaWG ? L10n.text("profileeditor.awg_3_1_parameters_are_saved_in_full_allowedips") : L10n.text("profileeditor.the_original_json_is_saved_when_connecting_routing_dns"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if model.draft.kind == .openConnect {
                     Section {
-                        DisclosureGroup("Дополнительные настройки") {
-                            TextField("Группа авторизации", text: $model.draft.authGroup)
-                            TextField("Отпечаток сертификата", text: $model.draft.certificatePin, prompt: Text("Необязательно, pin-sha256:…"))
-                            Toggle("Только TCP, без DTLS", isOn: $model.draft.disableDTLS)
+                        DisclosureGroup(L10n.text("profileeditor.advanced_settings")) {
+                            TextField(L10n.text("profileeditor.authentication_group"), text: $model.draft.authGroup)
+                            TextField(L10n.text("profileeditor.certificate_fingerprint"), text: $model.draft.certificatePin, prompt: Text(L10n.text("profileeditor.optional_pin_sha256")))
+                            Toggle(L10n.text("profileeditor.tcp_only_no_dtls"), isOn: $model.draft.disableDTLS)
                         }
                     }
                 }
@@ -95,15 +96,15 @@ struct ProfileEditor: View {
                     Text(notice).font(.caption).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) {
-                    Button("Проверить", systemImage: "stethoscope") { model.check() }
+                    Button(L10n.text("action.check"), systemImage: "stethoscope") { model.check() }
                         .disabled(model.connection.locked || model.switcher.isSwitching)
                     Spacer()
-                    Button("Готово") {
+                    Button(L10n.text("action.done")) {
                         if model.save(showNotice: false) { dismiss() }
                     }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                 }.controlSize(.large)
-                Text(model.connection.activeProfile == model.draft.id ? "Все данные сохраняются локально. Изменения применятся при следующем подключении." : "Все данные, включая пароли и конфигурации, сохраняются локально автоматически.")
+                Text(model.connection.activeProfile == model.draft.id ? L10n.text("profileeditor.all_data_is_saved_locally_changes_apply_to_the") : L10n.text("profileeditor.all_data_including_passwords_and_configurations_is_saved_locally"))
                     .font(.caption).foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 26).padding(.bottom, 20)

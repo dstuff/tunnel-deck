@@ -1,3 +1,4 @@
+import TunnelLocalization
 import SwiftUI
 import AppKit
 
@@ -6,18 +7,20 @@ struct LogView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Журнал соединения").font(.callout.weight(.medium))
-                Text("Секреты скрыты").font(.caption).foregroundStyle(.tertiary)
+                Text(L10n.text("logview.connection_log")).font(.callout.weight(.medium))
+                Text(L10n.text("logview.secrets_hidden")).font(.caption).foregroundStyle(.tertiary)
                 Spacer()
                 Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(connection.exportedLog, forType: .string) }
-                    label: { Image(systemName: "doc.on.doc") }.help("Копировать журнал")
-                Button { connection.clearLog() } label: { Image(systemName: "trash") }.help("Очистить журнал")
+                    label: { Image(systemName: "doc.on.doc") }.help(L10n.text("logview.copy_log"))
+                    .accessibilityLabel(L10n.text("logview.copy_log"))
+                Button { connection.clearLog() } label: { Image(systemName: "trash") }.help(L10n.text("logview.clear_log"))
+                    .accessibilityLabel(L10n.text("logview.clear_log"))
             }.buttonStyle(.borderless).padding(.horizontal, 22).padding(.vertical, 12)
             ScrollViewReader { scroll in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 5) {
                         if connection.logs.isEmpty {
-                            Text("События появятся после проверки или подключения.").foregroundStyle(.tertiary)
+                            Text(L10n.text("logview.events_will_appear_after_checking_or_connecting")).foregroundStyle(.tertiary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         ForEach(connection.logs) { entry in

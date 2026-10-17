@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 import TunnelCore
@@ -15,13 +16,13 @@ final class RoutingRuntime {
          resolvedHosts: [String: String] = [:]) throws {
         self.session = session
         guard let name = (300...999).map({ "utun\($0)" }).first(where: { $0.withCString { if_nametoindex($0) } == 0 }) else {
-            throw VPNError("Нет свободного интерфейса для общей маршрутизации.")
+            throw VPNError(L10n.message("routingruntime.no_interface_is_available_for_shared_routing"))
         }
         interface = name
         var ports = Set<UInt16>()
         func nextPort() throws -> UInt16 {
             for _ in 0..<20 { let value = try LoopbackPort.available(); if ports.insert(value).inserted { return value } }
-            throw VPNError("Не удалось выделить порты маршрутизатора.")
+            throw VPNError(L10n.message("routingruntime.could_not_allocate_router_ports"))
         }
         let trafficPort = try nextPort()
         info = try RoutingRuntimeInfo(probePort: nextPort(), dnsPort: nextPort())
@@ -37,19 +38,19 @@ final class RoutingRuntime {
         var env = environment(runtime: runtime)
         env["XRAY_LOCATION_ASSET"] = runtime.geoIP.path
         let cache = "/private/var/run/tunneldeck-dns-\(session.request.userID)"
-        if mkdir(cache, 0o700) != 0 && errno != EEXIST { throw VPNError("Не удалось создать кеш маршрутизатора.") }
+        if mkdir(cache, 0o700) != 0 && errno != EEXIST { throw VPNError(L10n.message("routingruntime.could_not_create_the_router_cache")) }
         let directoryFD = open(cache, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
-        guard directoryFD >= 0 else { throw VPNError("Некорректный каталог кеша маршрутизатора.") }
+        guard directoryFD >= 0 else { throw VPNError(L10n.message("routingruntime.invalid_router_cache_directory")) }
         defer { close(directoryFD) }
         var cacheInfo = stat()
-        guard fstat(directoryFD, &cacheInfo) == 0, cacheInfo.st_uid == 0, cacheInfo.st_mode & 0o077 == 0 else { throw VPNError("Некорректные права кеша маршрутизатора.") }
+        guard fstat(directoryFD, &cacheInfo) == 0, cacheInfo.st_uid == 0, cacheInfo.st_mode & 0o077 == 0 else { throw VPNError(L10n.message("routingruntime.invalid_router_cache_permissions")) }
         for suffix in ["v4", "v6"] {
             var info = stat()
             if fstatat(directoryFD, "fake.\(suffix)", &info, AT_SYMLINK_NOFOLLOW) == 0 {
                 guard info.st_uid == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1, info.st_mode & 0o077 == 0 else {
-                    throw VPNError("Некорректный файл кеша маршрутизатора.")
+                    throw VPNError(L10n.message("routingruntime.invalid_router_cache_file"))
                 }
-            } else if errno != ENOENT { throw VPNError("Не удалось проверить кеш маршрутизатора.") }
+            } else if errno != ENOENT { throw VPNError(L10n.message("routingruntime.could_not_verify_the_router_cache")) }
         }
         env["TUNNELDECK_FAKE_DNS_CACHE"] = cache + "/fake"
         do {
@@ -62,7 +63,7 @@ final class RoutingRuntime {
                 if Self.listenerReady(trafficPort), Self.listenerReady(info.probePort), Self.listenerReady(info.dnsPort), Self.listenerReady(systemProbePort) { ready = true; break }
                 usleep(100_000)
             }
-            guard ready else { throw VPNError("Маршрутизатор не запустил локальные слушатели за 10 секунд.") }
+            guard ready else { throw VPNError(L10n.message("routingruntime.the_router_did_not_start_its_local_listeners_within")) }
             bridge = try EngineProcess(executable: runtime.socksTunnel, arguments: [bridgeFile.path], env: env, session: session)
             ready = false
             for _ in 0..<100 {
@@ -71,7 +72,7 @@ final class RoutingRuntime {
                 if Self.interfaceReady(name) { ready = true; break }
                 usleep(100_000)
             }
-            guard ready else { throw VPNError("TUN-мост не настроил интерфейс за 10 секунд.") }
+            guard ready else { throw VPNError(L10n.message("routingruntime.the_tun_bridge_did_not_configure_its_interface_within")) }
             try network.configure(interface: name, addresses: SocksTunnelConfiguration.addresses, mtu: SocksTunnelConfiguration.mtu,
                 allowedIPs: ["0.0.0.0/0", "::/0"], dns: [RoutingConfiguration.resolverAddress])
             network.flushDNSCache()
@@ -80,8 +81,8 @@ final class RoutingRuntime {
     }
 
     func checkRunning(expectBridge: Bool = true) throws {
-        guard router?.process.isRunning == true else { throw VPNError("Общий маршрутизатор остановился. Подробности в диагностике.") }
-        if expectBridge, bridge?.process.isRunning != true { throw VPNError("Общий TUN-мост остановился.") }
+        guard router?.process.isRunning == true else { throw VPNError(L10n.message("routingruntime.the_shared_router_stopped_see_diagnostics_for_details")) }
+        if expectBridge, bridge?.process.isRunning != true { throw VPNError(L10n.message("routingruntime.the_shared_tun_bridge_stopped")) }
     }
     func stop() { bridge?.stop(); bridge = nil; router?.stop(); router = nil }
     deinit { stop() }

@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 
 public struct XrayConfiguration {
@@ -6,24 +7,24 @@ public struct XrayConfiguration {
 
     public init(_ input: String) throws {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.utf8.count < 256_000 else { throw VPNError("Конфигурация Xray слишком большая.") }
+        guard text.utf8.count < 256_000 else { throw VPNError(L10n.message("xrayconfiguration.the_xray_configuration_is_too_large")) }
         if text.hasPrefix("vless://") || text.hasPrefix("trojan://") {
             let imported = try Self.importLink(text)
             configuration = ["outbounds": [imported.outbound]]; displayName = imported.name
         } else {
             guard let data = text.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw VPNError("Вставьте JSON Xray либо ссылку VLESS/Trojan.")
+                throw VPNError(L10n.message("xrayconfiguration.paste_xray_json_or_a_vless_trojan_link"))
             }
             configuration = json["protocol"] != nil ? ["outbounds": [json]] : json
             displayName = nil
         }
         guard let outbounds = configuration["outbounds"] as? [[String: Any]], !outbounds.isEmpty else {
-            throw VPNError("В конфигурации Xray отсутствуют outbounds.")
+            throw VPNError(L10n.message("xrayconfiguration.the_xray_configuration_has_no_outbounds"))
         }
         let supported = Set(["vless", "vmess", "trojan", "shadowsocks", "socks", "http", "freedom", "blackhole", "dns", "wireguard", "hysteria"])
         for outbound in outbounds {
-            guard let p = outbound["protocol"] as? String, supported.contains(p) else { throw VPNError("Неподдерживаемый тип outbound в Xray.") }
+            guard let p = outbound["protocol"] as? String, supported.contains(p) else { throw VPNError(L10n.message("xrayconfiguration.unsupported_xray_outbound_type")) }
         }
         try Self.rejectFileAccess(configuration)
     }
@@ -69,7 +70,7 @@ public struct XrayConfiguration {
     public func selectedOutboundTag(_ selected: String?) throws -> String {
         if let selected, outboundChoices.contains(where: { $0.tag == selected }) { return selected }
         guard outboundChoices.count == 1, let only = outboundChoices.first else {
-            throw VPNError(outboundChoices.isEmpty ? "В Xray нет серверного подключения для действия «Через VPN»." : "В конфигурации несколько серверов Xray. Выберите основной в настройках подключения.")
+            throw VPNError(outboundChoices.isEmpty ? L10n.message("xrayconfiguration.xray_has_no_server_connection_for_the_through_vpn") : L10n.message("xrayconfiguration.the_configuration_has_multiple_xray_servers_choose_the_primary"))
         }
         return only.tag
     }
@@ -80,14 +81,14 @@ public struct XrayConfiguration {
         let generated = try JSONSerialization.jsonObject(with: proxyData(port: 1, physicalInterface: physicalInterface, resolvedHosts: resolvedHosts)) as! [String: Any]
         let source = generated["outbounds"] as! [[String: Any]]
         let tags = source.enumerated().map { $0.element["tag"] as? String ?? "outbound-\($0.offset + 1)" }
-        guard Set(tags).count == tags.count else { throw VPNError("Имена outbounds Xray должны быть уникальными.") }
+        guard Set(tags).count == tags.count else { throw VPNError(L10n.message("xrayconfiguration.xray_outbound_names_must_be_unique")) }
         var included = Set<Int>(), visiting = Set<Int>()
         func dependency(_ item: [String: Any]) -> String? {
             let stream = item["streamSettings"] as? [String: Any] ?? [:]
             return (stream["sockopt"] as? [String: Any])?["dialerProxy"] as? String ?? (item["proxySettings"] as? [String: Any])?["tag"] as? String
         }
         func visit(_ tag: String) throws {
-            guard let index = tags.firstIndex(of: tag), !visiting.contains(index) else { throw VPNError("Цепочка Xray содержит цикл или неизвестный outbound.") }
+            guard let index = tags.firstIndex(of: tag), !visiting.contains(index) else { throw VPNError(L10n.message("xrayconfiguration.the_xray_chain_contains_a_cycle_or_an_unknown")) }
             if included.contains(index) { return }
             visiting.insert(index)
             if let next = dependency(source[index]), !next.isEmpty { try visit(next) }
@@ -244,7 +245,7 @@ public struct XrayConfiguration {
         if let dictionary = value as? [String: Any] {
             let forbidden = Set(["certificatefile", "keyfile", "masterkeylog", "keylog", "lua", "luascript", "file", "filename"])
             for (key, value) in dictionary {
-                if forbidden.contains(key.lowercased()) { throw VPNError("Xray: внешние файлы и скрипты в импортированной конфигурации не поддерживаются.") }
+                if forbidden.contains(key.lowercased()) { throw VPNError(L10n.message("xrayconfiguration.xray_external_files_and_scripts_in_imported_configurations_are")) }
                 try rejectFileAccess(value)
             }
         } else if let array = value as? [Any] { for value in array { try rejectFileAccess(value) } }
@@ -253,15 +254,15 @@ public struct XrayConfiguration {
     private static func importLink(_ input: String) throws -> (outbound: [String: Any], name: String?) {
         guard let c = URLComponents(string: input), let scheme = c.scheme, let identity = c.user,
               !identity.isEmpty, let host = c.host, !host.isEmpty, let port = c.port,
-              (1...65535).contains(port), c.password == nil else { throw VPNError("Неполная ссылка Xray: нужны ключ, сервер и порт.") }
+              (1...65535).contains(port), c.password == nil else { throw VPNError(L10n.message("xrayconfiguration.incomplete_xray_link_a_key_server_and_port_are")) }
         var q: [String: String] = [:]
         for item in c.queryItems ?? [] { q[item.name] = item.value ?? "" }
         if q["allowInsecure"] == "1" || q["allowInsecure"] == "true" {
-            throw VPNError("Ссылка отключает проверку TLS. Нужна конфигурация с действительным сертификатом.")
+            throw VPNError(L10n.message("xrayconfiguration.the_link_disables_tls_verification_use_a_configuration_with"))
         }
         let network = q["type"] ?? "tcp"
         guard ["tcp", "raw", "ws", "grpc", "xhttp", "httpupgrade"].contains(network) else {
-            throw VPNError("Этот транспорт ссылки пока не импортируется. Используйте JSON Xray.")
+            throw VPNError(L10n.message("xrayconfiguration.this_link_transport_cannot_be_imported_yet_use_xray"))
         }
         let security = q["security"] ?? (scheme == "trojan" ? "tls" : "none")
         var stream: [String: Any] = ["network": network == "tcp" ? "raw" : network, "security": security]
@@ -269,7 +270,7 @@ public struct XrayConfiguration {
         switch security {
         case "reality":
             guard let key = q["pbk"], !key.isEmpty, network != "ws", network != "httpupgrade" else {
-                throw VPNError("Проверьте публичный ключ и транспорт REALITY.")
+                throw VPNError(L10n.message("xrayconfiguration.check_the_reality_public_key_and_transport"))
             }
             stream["realitySettings"] = ["serverName": sni, "fingerprint": q["fp"] ?? "chrome", "publicKey": key,
                                           "shortId": q["sid"] ?? "", "spiderX": q["spx"] ?? "/"]
@@ -278,7 +279,7 @@ public struct XrayConfiguration {
             if let alpn = q["alpn"], !alpn.isEmpty { tls["alpn"] = alpn.split(separator: ",").map(String.init) }
             stream["tlsSettings"] = tls
         case "none": break
-        default: throw VPNError("Неизвестная защита транспорта Xray.")
+        default: throw VPNError(L10n.message("xrayconfiguration.unknown_xray_transport_security"))
         }
         switch network {
         case "ws": stream["wsSettings"] = ["path": q["path"] ?? "/", "headers": ["Host": q["host"] ?? sni]]

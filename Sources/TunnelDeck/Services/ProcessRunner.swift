@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import TunnelCore
 
@@ -5,8 +6,8 @@ private final class OutputBuffer {
     private let lock = NSLock()
     private var bytes = Data()
     private var pending = Data()
-    let callback: ((String) -> Void)?
-    init(callback: ((String) -> Void)? = nil) { self.callback = callback }
+    let callback: ((LocalizedMessage) -> Void)?
+    init(callback: ((LocalizedMessage) -> Void)? = nil) { self.callback = callback }
     func append(_ data: Data) {
         lock.lock(); defer { lock.unlock() }
         if bytes.count < 1_000_000 { bytes.append(data) }
@@ -15,13 +16,13 @@ private final class OutputBuffer {
         while let end = pending.firstIndex(of: 10) {
             let line = String(decoding: pending[..<end], as: UTF8.self)
             pending.removeSubrange(...end)
-            if !line.isEmpty { callback(line) }
+            if !line.isEmpty { callback(.verbatim(line)) }
         }
-        if pending.count > 64_000 { pending.removeAll(); callback("Длинная строка скрыта.") }
+        if pending.count > 64_000 { pending.removeAll(); callback(L10n.message("processrunner.a_long_line_was_hidden")) }
     }
     func finish() -> Data {
         lock.lock(); defer { lock.unlock() }
-        if !pending.isEmpty { callback?(String(decoding: pending, as: UTF8.self)); pending.removeAll() }
+        if !pending.isEmpty { callback?(.verbatim(String(decoding: pending, as: UTF8.self))); pending.removeAll() }
         return bytes
     }
 }
@@ -33,7 +34,7 @@ struct ProcessOutput { let status: Int32; let stdout: String; let stderr: String
     func cancel() { if let process, process.isRunning { process.terminate() } }
 
     func run(_ executable: String, _ arguments: [String], input: String? = nil, timeout: TimeInterval = 45,
-             logStandardOutput: Bool = false, log: ((String) -> Void)? = nil) async throws -> ProcessOutput {
+             logStandardOutput: Bool = false, log: ((LocalizedMessage) -> Void)? = nil) async throws -> ProcessOutput {
         let child = Process(), output = Pipe(), errors = Pipe(), stdin = Pipe()
         let stdout = OutputBuffer(callback: logStandardOutput ? log : nil), stderr = OutputBuffer(callback: log)
         child.executableURL = URL(fileURLWithPath: executable); child.arguments = arguments

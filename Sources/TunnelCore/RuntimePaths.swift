@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 
 public struct RuntimePaths: Sendable {
@@ -12,7 +13,7 @@ public struct RuntimePaths: Sendable {
         guard FileManager.default.isExecutableFile(atPath: xray), FileManager.default.isExecutableFile(atPath: socksTunnel),
               FileManager.default.fileExists(atPath: geoIP.appendingPathComponent("geoip.dat").path),
               FileManager.default.fileExists(atPath: geoIP.appendingPathComponent("countries.bin").path) else {
-            throw VPNError("В сборке отсутствует общий маршрутизатор или база стран. Переустановите TunnelDeck.")
+            throw VPNError(L10n.message("runtimepaths.the_app_is_missing_the_shared_router_or_country"))
         }
     }
     public var openconnect: String? {
@@ -27,15 +28,15 @@ public struct RuntimePaths: Sendable {
         switch kind {
         case .openConnect:
             guard openconnect != nil, vpncScript != nil else {
-                throw VPNError("В сборке отсутствует OpenConnect или сетевой скрипт. Переустановите TunnelDeck.")
+                throw VPNError(L10n.message("runtimepaths.the_app_is_missing_openconnect_or_its_network_script"))
             }
         case .amneziaWG:
             guard FileManager.default.isExecutableFile(atPath: amnezia), FileManager.default.isExecutableFile(atPath: awg) else {
-                throw VPNError("В сборке отсутствует движок AmneziaWG 3.1. Запустите script/prepare_runtimes.sh.")
+                throw VPNError(L10n.message("runtimepaths.the_amneziawg_3_1_engine_is_missing_run_script"))
             }
         case .xray:
             guard FileManager.default.isExecutableFile(atPath: xray), FileManager.default.isExecutableFile(atPath: socksTunnel) else {
-                throw VPNError("В сборке отсутствует Xray или TUN-мост. Запустите script/prepare_runtimes.sh.")
+                throw VPNError(L10n.message("runtimepaths.xray_or_the_tun_bridge_is_missing_run_script"))
             }
         }
     }

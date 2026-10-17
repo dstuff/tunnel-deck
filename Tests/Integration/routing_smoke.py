@@ -21,6 +21,8 @@ import tempfile
 import threading
 import time
 
+from swift_fixture import fixture_inputs
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -241,13 +243,10 @@ def main():
         secure_web.socket = server_tls.wrap_socket(secure_web.socket, server_side=True)
         start(secure_web)
         fixture = temp / "routing-fixture"
-        subprocess.run(["xcrun", "swiftc", "-emit-library", "-emit-module", "-module-name", "TunnelCore",
-                        *map(str, sorted((ROOT / "Sources/TunnelCore").glob("*.swift"))),
-                        "-emit-module-path", str(temp / "TunnelCore.swiftmodule"),
-                        "-o", str(temp / "libTunnelCore.dylib")], check=True, timeout=120)
-        subprocess.run(["xcrun", "swiftc", "-I", str(temp), "-L", str(temp), "-lTunnelCore",
-                        "-Xlinker", "-rpath", "-Xlinker", str(temp),
-                        str(Path(__file__).with_name("RoutingFixture.swift")), "-o", str(fixture)], check=True, timeout=60)
+        modules, objects = fixture_inputs()
+        subprocess.run(["xcrun", "swiftc", "-I", str(modules),
+                        str(Path(__file__).with_name("RoutingFixture.swift")),
+                        *map(str, objects), "-o", str(fixture)], check=True, timeout=60)
         # Synthetic GeoIP covers only loopback; the production database is tested separately.
         cidr = b"\x0a\x04\x7f\x00\x00\x01\x10\x20"
         entry = b"\x0a\x02RU\x12" + bytes([len(cidr)]) + cidr

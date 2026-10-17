@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import Darwin
 
@@ -9,11 +10,11 @@ public struct IPNetwork: Equatable, Sendable {
     public init(_ text: String) throws {
         let parts = text.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count <= 2, let address = Self.address(String(parts[0])) else {
-            throw VPNError("Введите корректный IP-адрес или подсеть, например 10.20.0.0/16.")
+            throw VPNError(L10n.message("ipnetwork.enter_a_valid_ip_address_or_subnet_such_as"))
         }
         let bits = address.count * 8
         let width = parts.count == 2 ? Int(parts[1]) : bits
-        guard let width, (0...bits).contains(width) else { throw VPNError("Некорректная длина префикса подсети.") }
+        guard let width, (0...bits).contains(width) else { throw VPNError(L10n.message("ipnetwork.invalid_subnet_prefix_length")) }
         prefix = width
         bytes = address.enumerated().map { index, byte in
             let remaining = width - index * 8
@@ -46,12 +47,12 @@ public struct IPNetwork: Equatable, Sendable {
     }
 
     public static func prefixLength(netmask: String) throws -> Int {
-        guard let bytes = address(netmask) else { throw VPNError("Сервер передал некорректную маску сети.") }
+        guard let bytes = address(netmask) else { throw VPNError(L10n.message("ipnetwork.the_server_provided_an_invalid_network_mask")) }
         var count = 0, ended = false
         for byte in bytes {
             for bit in (0...7).reversed() {
                 if byte & (1 << bit) != 0 {
-                    guard !ended else { throw VPNError("Сервер передал некорректную маску сети.") }
+                    guard !ended else { throw VPNError(L10n.message("ipnetwork.the_server_provided_an_invalid_network_mask")) }
                     count += 1
                 } else { ended = true }
             }

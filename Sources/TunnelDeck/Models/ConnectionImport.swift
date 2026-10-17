@@ -1,3 +1,4 @@
+import TunnelLocalization
 import Foundation
 import TunnelCore
 
@@ -10,8 +11,8 @@ struct ConnectionImport {
 
     init(_ input: String) throws {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { throw VPNError("Вставьте ссылку, адрес сервера или конфигурацию.") }
-        guard text.utf8.count < 256_000 else { throw VPNError("Конфигурация слишком большая.") }
+        guard !text.isEmpty else { throw VPNError(L10n.message("connectionimport.paste_a_link_server_address_or_configuration")) }
+        guard text.utf8.count < 256_000 else { throw VPNError(L10n.message("connectionimport.the_configuration_is_too_large")) }
         let firstContentLine = text.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .first { !$0.isEmpty && !$0.hasPrefix("#") }
