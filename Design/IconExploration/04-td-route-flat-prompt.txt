@@ -1,0 +1,18 @@
+TunnelDeck — Flat TD Route Switch
+Date: 2026-10-17
+Generation: built-in image_gen.
+References: 02-route-switch.png and 03-td-monogram.png.
+Output: 04-td-route-flat.png; normalized to 1024 x 1024 with sips.
+
+Use case: logo-brand.
+Asset type: macOS app icon exploration for TunnelDeck.
+Direction name: Flat TD Route Switch.
+Input images: Image 1 (route switch) and Image 2 (TD monogram) are edit targets to combine into ONE redesigned icon. Preserve their deep-blue tile and ice-blue/cyan palette, but fundamentally flatten the rendering and combine their ideas into a single custom network monogram.
+
+Primary request: one unified T-D symbol made entirely of simple routing paths and circular network nodes. The T itself IS a network switch. A straight horizontal top bar and a vertical central stem clearly read as an uppercase T, NOT a Y. Small filled round nodes mark the left and right ends of the crossbar, the lower end of the stem, and a central junction on the stem. The RIGHT branch of this T bends outward and down in one broad smooth clockwise loop, then returns to the central junction on the T's vertical stem, enclosing a large dark D-shaped opening. The T's vertical segment serves as the D's shared straight left spine. Thus the right branch becomes the rounded side of D. The return junction is aligned on the T's central vertical stem, not a separate disconnected object. Aim for a legible integrated TD monogram that is also a believable route diagram. The D should be substantial and almost the full height of the T, so the result reads TD rather than TP.
+Topology and visual hierarchy: left terminal -> top bar -> stem is pale ice blue; right branch and returning D loop are vivid cyan. The return junction joins the stem visibly. Node disks have diameter about 1.6 times path width, much smaller and flatter than the bulbous balls in Image 1. Keep the internal opening generously sized. One D loop only, no additional loops, arrows, tunnel entrance, road, ribbon, or letters drawn separately from the paths. The network geometry itself forms the monogram.
+Style: genuinely flat 2D graphic design. Solid fills with uniform path thickness, crisp smooth rounded joins, restrained geometry, front-facing. NO extrusion, bevels, 3D spheres, glossy highlights, material textures, ambient shading, cast shadows, lighting effects, gradients on the symbol, neon glow or glass. Think a carefully designed modern application logo, not a 3D object. Use only deep navy-blue background, pale ice blue inactive paths, bright cyan active paths.
+Composition: ONE centered icon on a 1024 x 1024 square canvas. Rounded-square deep navy tile occupies about 84% of canvas width with equal outside margins and one precise continuous silhouette. Symbol occupies approximately 65% of tile width and height, centered with generous breathing room. No inset panels or borders. Remain identifiable at 32 px.
+Transparency: outside the tile must be truly empty alpha 0. Clean smooth antialiased tile edge; remove any inherited exterior speckles, glows, shadow or haze, no checkerboard illustration.
+Text: no captions, labels, name, numbers or watermark. The only letter-like forms are the routing paths forming T and D.
+Output: one finished flat macOS app-icon concept, combining the two attached ideas.

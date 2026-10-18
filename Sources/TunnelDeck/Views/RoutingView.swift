@@ -58,18 +58,7 @@ struct RoutingView: View {
                         }.padding(22)
                         Spacer()
                     } else {
-                        List(selection: $selection) {
-                            ForEach(Array(model.routing.rules.enumerated()), id: \.element.id) { index, rule in
-                                VStack(spacing: 0) {
-                                    row(rule, index: index)
-                                    if index < model.routing.rules.count - 1 { Divider().padding(.horizontal, 20) }
-                                }
-                                .tag(rule.id).listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                            }
-                        }
-                        .listStyle(.plain).scrollContentBackground(.hidden)
-                        .focused($listFocused)
+                        rulesList
                     }
                     Button(L10n.text("routingview.check_address")) { showingCheck = true }
                         .padding(20).disabled(model.routingError != nil)
@@ -113,6 +102,37 @@ struct RoutingView: View {
         } message: { Text(fileError ?? "") }
     }
 
+    private var rulesList: some View {
+        // A selectable List adds its own full-row highlight behind the inset rule outline.
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(model.routing.rules.enumerated()), id: \.element.id) { index, rule in
+                        VStack(spacing: 0) {
+                            row(rule, index: index)
+                            if index < model.routing.rules.count - 1 { Divider().padding(.horizontal, 20) }
+                        }
+                        .id(rule.id)
+                    }
+                }
+            }
+            .focusable()
+            .focusEffectDisabled()
+            .focused($listFocused)
+            .onMoveCommand { direction in
+                guard direction == .up || direction == .down else { return }
+                let rules = model.routing.rules
+                guard !rules.isEmpty else { return }
+                let index = rules.firstIndex { $0.id == selection }
+                let next = direction == .down ? min((index ?? -1) + 1, rules.count - 1) : max((index ?? rules.count) - 1, 0)
+                selection = rules[next].id
+            }
+            .onChange(of: selection) { _, id in
+                if let id { scroll.scrollTo(id) }
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
@@ -131,9 +151,9 @@ struct RoutingView: View {
             }.font(.callout)
             Spacer(minLength: 8)
             Button(L10n.text("routingview.apply_and_reconnect")) { model.applyRouting() }
-                .buttonStyle(PrimaryConnectionButtonStyle()).disabled(!model.canApplyRouting)
+                .buttonStyle(SecondaryConnectionButtonStyle()).disabled(!model.canApplyRouting)
             Button(L10n.text("action.done")) { if model.save(showNotice: false) { dismiss() } }
-                .buttonStyle(SecondaryConnectionButtonStyle())
+                .buttonStyle(PrimaryConnectionButtonStyle())
         }
     }
 
@@ -159,8 +179,8 @@ struct RoutingView: View {
         }
         .padding(.horizontal, 17).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-        .background(selection == rule.id ? Color.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(selection == rule.id ? Color.blue.opacity(0.5) : .clear))
+        .background(selection == rule.id ? Color.accentColor.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selection == rule.id ? Color.accentColor.opacity(0.5) : .clear))
         .padding(.horizontal, 5).padding(.vertical, 3)
         .onTapGesture { selection = rule.id; listFocused = true }
         .contextMenu {
@@ -170,6 +190,7 @@ struct RoutingView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selection == rule.id ? [.isSelected] : [])
+        .accessibilityAction { selection = rule.id; listFocused = true }
         .draggable(rule.id.uuidString)
         .dropDestination(for: String.self) { items, _ in
             guard let text = items.first, let id = UUID(uuidString: text), model.routing.rules.contains(where: { $0.id == id }) else { return false }

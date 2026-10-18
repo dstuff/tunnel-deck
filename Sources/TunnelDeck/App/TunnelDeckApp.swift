@@ -23,14 +23,12 @@ import TunnelCore
         Window(L10n.text("window.profile_editor"), id: "profile-editor") {
             ProfileEditor(model: model)
                 .localizedWindowTitle(L10n.text("window.profile_editor"))
-                .tint(.blue)
         }
         .defaultSize(width: 640, height: 620)
         .windowResizability(.contentMinSize)
         Window(L10n.text("connection.new"), id: "add-connection") {
             AddConnectionView(model: model)
                 .localizedWindowTitle(L10n.text("connection.new"))
-                .tint(.blue)
         }
         .windowResizability(.contentSize)
         Window(L10n.text("window.diagnostics"), id: "diagnostics") {
@@ -41,7 +39,6 @@ import TunnelCore
         Window(L10n.text("window.routing"), id: "routing") {
             RoutingView(model: model)
                 .localizedWindowTitle(L10n.text("window.routing"))
-                .tint(.blue)
                 .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? (CommandLine.arguments.contains("--light-preview") ? .light : .dark) : nil)
         }
         .defaultSize(width: 960, height: 660)
@@ -53,8 +50,18 @@ import TunnelCore
         MenuBarExtra {
             MenuBarActions(model: model)
         } label: {
-            Label("TunnelDeck — \(model.connection.state.title)", systemImage: model.connection.state.menuBarSymbol)
-                .labelStyle(.iconOnly)
+            Label {
+                Text("TunnelDeck — \(model.connection.state.title)")
+            } icon: {
+                if model.connection.state == .connected || model.connection.state.busy,
+                   let image = NSImage(systemSymbolName: model.connection.state.menuBarSymbol, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(pointSize: 16, weight: .regular)) {
+                    Image(nsImage: image).renderingMode(.template)
+                } else {
+                    Image(systemName: model.connection.state.menuBarSymbol)
+                }
+            }
+            .labelStyle(.iconOnly)
         }
     }
 }

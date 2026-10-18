@@ -1,0 +1,34 @@
+TunnelDeck icon exploration — visual QA
+Date: 2026-10-17
+
+Deliverables
+01-portal-route.png
+02-route-switch.png
+03-td-monogram.png
+All three files: 1024 x 1024, PNG RGBA, alpha range 0..255.
+Source: built-in image_gen, with separate calls per direction.
+Prompts: prompts.txt
+Comparison: qa-preview.png
+
+Visual inspection
+Inspected all three icons at native 128, 64 and 32 px on light (#f5f6f8)
+and dark (#1d222c) backgrounds using qa-preview.png.
+The portal silhouette and cyan route remain distinct at 32 px.
+The route-switch junction and highlighted branch remain distinguishable at 32 px.
+The TD silhouette remains readable at 32 px; the route inside D becomes a small
+cyan accent at that size, with the tunnel detail clearer at 64 and 128 px.
+The tile and principal symbols remain distinguishable on both backgrounds.
+
+Transparency inspection
+All source images and delivered PNGs have genuine alpha transparency.
+All four canvas corners are fully transparent.
+No detached pixels remain at alpha >= 16/255 in any delivered PNG.
+At alpha 1..15/255 the generator leaves faint detached pixels in the padding:
+portal: 5893 pixels; route switch: 1747 pixels; monogram: 357 pixels.
+These do not present visible specks in the inspected native-size comparisons.
+Strictly empty exterior alpha is therefore not yet verified; the chosen design
+should receive final edge preparation before application-icon packaging.
+
+Integration
+These are selection previews. Resources/AppIcon.png and Resources/AppIcon.icns
+have not been replaced. No VPN or application code changes are part of this work.

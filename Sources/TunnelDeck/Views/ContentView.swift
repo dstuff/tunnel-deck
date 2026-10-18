@@ -20,7 +20,7 @@ struct ContentView: View {
                     Text(model.routing.name).foregroundStyle(.secondary).lineLimit(1)
                     Spacer(minLength: 12)
                     if model.routingPending { Text(L10n.text("contentview.changes_pending")).font(.caption).foregroundStyle(.orange) }
-                    Text(L10n.text("contentview.configure")).foregroundStyle(.blue)
+                    Text(L10n.text("contentview.configure")).foregroundStyle(.tint)
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                 }.contentShape(Rectangle()).padding(.horizontal, 28).padding(.vertical, 13)
             }.buttonStyle(.plain).help(L10n.text("contentview.shared_rules_for_all_connections"))
@@ -74,7 +74,6 @@ struct ContentView: View {
             .padding(.horizontal, 28).padding(.vertical, 16)
         }
         .frame(minWidth: 720, minHeight: 480)
-        .tint(.blue)
         .navigationTitle("TunnelDeck")
         .onAppear { if CommandLine.arguments.contains("--routing-preview") { present("routing") } }
         .alert(L10n.text("contentview.delete_connection"), isPresented: Binding(

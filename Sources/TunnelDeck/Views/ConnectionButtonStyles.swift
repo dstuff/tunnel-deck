@@ -9,7 +9,7 @@ struct PrimaryConnectionButtonStyle: ButtonStyle {
             .lineLimit(1).fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 18).frame(height: 36)
             .foregroundStyle(.white)
-            .background(.blue.opacity(configuration.isPressed ? 0.8 : 1),
+            .background(.tint.opacity(configuration.isPressed ? 0.8 : 1),
                         in: RoundedRectangle(cornerRadius: 8))
             .opacity(isEnabled ? 1 : 0.45)
             .contentShape(RoundedRectangle(cornerRadius: 8))

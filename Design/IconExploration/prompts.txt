@@ -1,0 +1,48 @@
+TunnelDeck icon exploration
+Date: 2026-10-17
+Generation: built-in image_gen; separate calls for each direction.
+Reference: Resources/AppIcon.png (existing icon, redesigned symbol and tile).
+Generated source dimensions: 1254 x 1254. Delivery normalization: sips to 1024 x 1024, preserving RGBA.
+
+1. Portal and Route
+Output: 01-portal-route.png
+
+Use case: logo-brand.
+Asset type: macOS application icon for TunnelDeck, a multi-protocol VPN client with traffic routing.
+Direction name: Portal and Route.
+Redesign the supplied current app icon. Image 1 is the edit target and a reference for the polished, softly dimensional macOS icon finish. Preserve a centered rounded-square tile and generous outer padding, but replace the white tile surface with a deep navy-blue surface, and completely replace the chain-link symbol with the following new symbol.
+
+Primary request: one single thick pale ice-blue arch, a recognizable tunnel entrance, with one continuous luminous cyan traffic ribbon visibly passing through its opening. A bold, beautifully simple icon that communicates network tunneling.
+Composition: square 1024 x 1024 output, one icon only, front-facing, centered. The rounded-square tile occupies approximately 84% of canvas width with a smooth continuous silhouette and equal padding on all sides. The arch occupies about 60% of tile width. Slight internal depth inside its dark opening; a single broad cyan route extends from the foreground under the arch toward the back. The route stays inside the tile. One arch only, no repeated nested arches, no branching lines.
+Style: high-quality restrained 3D macOS icon, smooth satin enamel, soft bevels, broad clean surfaces, very subtle ambient shadows inside the tile. Calm soft upper-left studio illumination. Deep navy blue background, pale ice-blue arch, cyan route. Strong silhouette and deliberately sparse detail, readable at 32 pixels.
+Transparency: REAL transparent alpha everywhere outside the rounded-square tile, including the corners of the square canvas. A crisp clean antialiased tile edge; no exterior shadow, glow, stray flecks, halo, rough cutout, or painted checkerboard.
+Avoid: chain links, padlocks, shields, globes, lettering, labels, arrows, decorative particles, stars, environmental scenes, extra inset tiles, frame around the icon, neon bloom, glass transparency on the symbol, thin lines, complex perspective. No text or watermark. Produce just this single finished app icon.
+
+2. Route Switch
+Output: 02-route-switch.png
+
+Use case: logo-brand.
+Asset type: macOS application icon for TunnelDeck, a multi-protocol VPN client with traffic routing.
+Direction name: Route Switch.
+Redesign the supplied current app icon. Image 1 is the edit target and a reference for the polished, softly dimensional macOS icon finish. Preserve a centered rounded-square tile with generous outer padding, but replace the white surface with a deep navy-blue surface and completely replace the chain-link symbol with a bold route-switching symbol.
+
+Primary request: a simple softly dimensional network junction: three broad curved paths from three round terminal nodes meet at one central round hub. Exactly three terminal nodes plus one central hub. A Y-shaped route diagram with balanced spacing and wide empty areas between its arms. This icon represents selecting between VPN connection profiles and routing traffic.
+Composition: square 1024 x 1024 output, one icon only, nearly straight-on front view with subtle object depth. One rounded-square tile occupies approximately 84% of canvas width, centered with equal margins. Entire junction occupies about 62% of tile width and height. Terminal nodes at upper-left, upper-right and lower-center, hub in the middle. The path from the lower terminal through the hub to the upper-right terminal is bright cyan-blue and visually continuous. The remaining upper-left branch and its terminal are muted pale steel blue, legible but subordinate. The hub is a simple smooth circular form, not a button with an additional symbol. Routes have thick consistent widths and smooth gentle curves. All elements fully inside the tile.
+Style: high-quality restrained 3D macOS icon, smooth satin enamel and shallow extruded rounded geometry. Soft edge highlights, calm upper-left studio illumination, very subtle shadows inside the tile. Deep navy background, pale ice blue inactive branch, cyan active route. No dramatic glow. Strong silhouette, deliberately sparse detail, readable at 32 pixels.
+Transparency: REAL transparent alpha everywhere outside the rounded-square tile and at canvas corners. The tile must have one perfectly smooth continuous clean antialiased silhouette. Remove exterior shadows, glow, flecks, detached pixels, haze, rim noise or rough edges inherited from the reference. No painted checkerboard.
+Avoid: chain links, archways, padlocks, shields, globes, lettering, text, labels, arrowheads, dots along the paths, badges, switches or sliders, extra nested squares, environmental scenes, neon bloom, fine lines, glass transparency, metallic mirror reflections. No watermark. Produce just this one finished app icon.
+
+3. TD Tunnel Monogram
+Output: 03-td-monogram.png
+
+Use case: logo-brand.
+Asset type: macOS application icon for TunnelDeck, a multi-protocol VPN client with traffic routing.
+Direction name: TD Tunnel Monogram.
+Redesign the supplied current app icon. Image 1 is the edit target and a reference for the polished softly dimensional macOS icon finish. Preserve a centered rounded-square tile with generous outer padding, but replace the white tile with deep navy blue, and completely replace the chain links with a custom unified T-D monogram.
+
+Primary request: a single bespoke sculptural monogram made from the uppercase Latin letters "TD", spelled T then D, joined into one coherent substantial emblem. Both letters must be clearly readable. The left upright of D is shared with the stem of T, with the T crossbar extending left and across the top. The D's open internal counter becomes a dark tunnel entrance, and a single short broad cyan route emerges through that opening toward the foreground. A strong brand mark that combines the name TunnelDeck with network tunneling. The route should be secondary to the letter shapes.
+Composition: square 1024 x 1024 output, one icon only, almost straight-on front view with subtle shallow extrusion. Rounded-square tile occupies approximately 84% of canvas width, centered with equal margins. Monogram occupies around 66% of tile width and 60% of tile height, centered. Bold simple geometry, rounded bevels, broad T crossbar, clearly D-shaped curved right side. Monogram is pale ice-blue enamel, with softly shaded thickness. The tunnel counter remains large and dark so the D does not close up at small size. A simple cyan ribbon comes from within this counter and stays inside the tile. No separate arch outside the letters.
+Style: restrained high-quality 3D macOS icon, smooth satin enamel, calm upper-left studio lighting, subtle shadows within tile, clean manufactured surfaces. Deep navy blue tile, pale ice-blue letters, cyan accent route. Use the same visual restraint as an elegant native macOS utility icon. Strong silhouette and sparse detail, readable at 32 pixels.
+Text (verbatim): "TD" as the central monogram only. No other text, words, numbers, labels, watermark or signature.
+Transparency: REAL transparent alpha everywhere outside the tile and at the canvas corners. Perfectly smooth continuous clean antialiased tile silhouette; no exterior shadows, glow, flecks, detached pixels, rim noise, rough cutout or checkerboard illustration.
+Avoid: chain links, shields, padlocks, globes, extra icons, neon bloom, thin typography, serif lettering, mirrored letters, a third letter, chrome or gold materials, decorative particles, extra inset tiles, surrounding frame, environmental scenes. Produce just this one finished app icon.
