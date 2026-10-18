@@ -15,7 +15,39 @@ struct ProfileRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 26) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) {
+                identity
+                Spacer(minLength: 12)
+                connectionAction.fixedSize()
+                actionsMenu
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 16) {
+                    identity
+                    Spacer(minLength: 0)
+                    actionsMenu
+                }
+                HStack { Spacer(minLength: 0); connectionAction }
+            }
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .background(state == .connected ? Color.accentColor.opacity(0.09) : .clear,
+                    in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            if state == .connected {
+                RoundedRectangle(cornerRadius: 12).strokeBorder(.tint.opacity(0.2))
+            }
+        }
+        .contextMenu {
+            Button(L10n.text("profilerowview.configure"), action: edit).disabled(!model.canManageProfiles)
+            Button(L10n.text("profilerowview.delete"), role: .destructive, action: delete).disabled(!canDelete)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var identity: some View {
+        HStack(spacing: 18) {
             Image(systemName: profile.kind.symbol)
                 .font(.system(size: 24, weight: .regular))
                 .foregroundStyle(state == .connected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
@@ -23,11 +55,14 @@ struct ProfileRowView: View {
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 11))
             VStack(alignment: .leading, spacing: 5) {
                 Text(profile.name).font(.system(size: 16, weight: .semibold))
-                    .lineLimit(1).truncationMode(.middle)
+                    .lineLimit(2).truncationMode(.middle)
                 Text(profile.kind.title).font(.callout).foregroundStyle(.secondary)
             }
             .help(profile.name)
-            Spacer(minLength: 16)
+        }.frame(minWidth: 180, alignment: .leading)
+    }
+
+    @ViewBuilder private var connectionAction: some View {
             if state == .connected {
                 Label(L10n.text("connection.state.connected"), systemImage: "circle.fill")
                     .font(.callout).foregroundStyle(.green)
@@ -41,6 +76,9 @@ struct ProfileRowView: View {
                     .buttonStyle(SecondaryConnectionButtonStyle())
                     .disabled(!model.canConnectProfile)
             }
+    }
+
+    private var actionsMenu: some View {
             Menu {
                 Button(L10n.text("profilerowview.configure"), systemImage: "slider.horizontal.3", action: edit)
                     .disabled(!model.canManageProfiles)
@@ -56,20 +94,6 @@ struct ProfileRowView: View {
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             .help(L10n.text("profilerowview.actions_for_connection", [.init(profile.name)]))
             .accessibilityLabel(L10n.text("profilerowview.actions_for_connection_229", [.init(profile.name)]))
-        }
-        .padding(.horizontal, 18).padding(.vertical, 12)
-        .background(state == .connected ? Color.accentColor.opacity(0.09) : .clear,
-                    in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            if state == .connected {
-                RoundedRectangle(cornerRadius: 12).strokeBorder(.tint.opacity(0.2))
-            }
-        }
-        .contextMenu {
-            Button(L10n.text("profilerowview.configure"), action: edit).disabled(!model.canManageProfiles)
-            Button(L10n.text("profilerowview.delete"), role: .destructive, action: delete).disabled(!canDelete)
-        }
-        .accessibilityElement(children: .contain)
     }
 
     private var actionTitle: String {

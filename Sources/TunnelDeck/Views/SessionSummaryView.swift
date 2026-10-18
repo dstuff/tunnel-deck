@@ -18,30 +18,16 @@ struct SessionSummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 18) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        ConnectionStatusIndicator(state: connection.state).scaleEffect(1.35)
-                        statusTitle.font(.system(size: 19, weight: .semibold)).lineLimit(1)
-                    }
-                    if let date = connection.connectedAt {
-                        TimelineView(.periodic(from: date, by: 1)) { context in
-                            Text(Duration.seconds(max(0, Int(context.date.timeIntervalSince(date))))
-                                .formatted(.time(pattern: .hourMinuteSecond(padHourToLength: 2))))
-                                .monospacedDigit().font(.callout).foregroundStyle(.secondary)
-                        }
-                        .padding(.leading, 17)
-                    } else {
-                        Text(subtitle).font(.callout).foregroundStyle(.secondary)
-                            .lineLimit(1).padding(.leading, 17)
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    status
+                    Spacer(minLength: 16)
+                    actionButton.fixedSize()
                 }
-                Spacer(minLength: 16)
-                Button(actionTitle, action: performAction)
-                    .buttonStyle(PrimaryConnectionButtonStyle())
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled((connection.state == .disconnecting && !model.switcher.isSwitching) ||
-                              (!model.hasSelectedProfile && !model.canManageProfiles))
+                VStack(alignment: .leading, spacing: 12) {
+                    status
+                    HStack { Spacer(minLength: 0); actionButton }
+                }
             }
             if let error {
                 HStack(alignment: .top, spacing: 16) {
@@ -65,6 +51,34 @@ struct SessionSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+    }
+
+    private var status: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                ConnectionStatusIndicator(state: connection.state).scaleEffect(1.35)
+                statusTitle.font(.system(size: 19, weight: .semibold)).lineLimit(1)
+                    .truncationMode(.tail).help(title)
+            }
+            if let date = connection.connectedAt {
+                TimelineView(.periodic(from: date, by: 1)) { context in
+                    Text(Duration.seconds(max(0, Int(context.date.timeIntervalSince(date))))
+                        .formatted(.time(pattern: .hourMinuteSecond(padHourToLength: 2))))
+                        .monospacedDigit().font(.callout).foregroundStyle(.secondary)
+                }.padding(.leading, 17)
+            } else {
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+                    .lineLimit(2).padding(.leading, 17)
+            }
+        }
+    }
+
+    private var actionButton: some View {
+        Button(actionTitle, action: performAction)
+            .buttonStyle(PrimaryConnectionButtonStyle())
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled((connection.state == .disconnecting && !model.switcher.isSwitching) ||
+                      (!model.hasSelectedProfile && !model.canManageProfiles))
     }
 
     private var statusTitle: Text {

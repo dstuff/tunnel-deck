@@ -5,6 +5,7 @@ import TunnelCore
 struct RoutingRuleEditor: View {
     @Binding var rule: RoutingRule
     let number: Int
+    var showsTitle = true
     let remove: () -> Void
     private enum Category: String, CaseIterable {
         case site, network, country
@@ -36,12 +37,13 @@ struct RoutingRuleEditor: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.text("routingruleeditor.rule", [.init(number)])).font(.title3.weight(.semibold))
+            if showsTitle { Text(L10n.text("routingruleeditor.rule", [.init(number)])).font(.title3.weight(.semibold)) }
             VStack(alignment: .leading, spacing: 9) {
                 Text(L10n.text("routingruleeditor.what_to_match")).foregroundStyle(.secondary)
-                Picker(L10n.text("routingruleeditor.what_to_match"), selection: category) {
-                    ForEach(Category.allCases, id: \.self) { Text($0.title).tag($0) }
-                }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: .infinity)
+                ViewThatFits(in: .horizontal) {
+                    categoryPicker.pickerStyle(.segmented).fixedSize(horizontal: true, vertical: false)
+                    categoryPicker.pickerStyle(.menu)
+                }
             }
             VStack(alignment: .leading, spacing: 9) {
                 switch rule.match.type {
@@ -91,5 +93,11 @@ struct RoutingRuleEditor: View {
             Button(role: .destructive, action: remove) { Text(L10n.text("routingruleeditor.delete_rule")).foregroundStyle(.red) }
         }
         .controlSize(.regular).padding(20)
+    }
+
+    private var categoryPicker: some View {
+        Picker(L10n.text("routingruleeditor.what_to_match"), selection: category) {
+            ForEach(Category.allCases, id: \.self) { Text($0.title).tag($0) }
+        }.labelsHidden()
     }
 }

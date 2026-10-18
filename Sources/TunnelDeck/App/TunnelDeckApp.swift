@@ -6,6 +6,7 @@ import TunnelCore
 @main struct TunnelDeckApp: App {
     @State private var model: AppModel
     @State private var language: LanguageSettings
+    private let windows = MainWindowCoordinator()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     init() {
         let language = LanguageSettings.shared
@@ -14,12 +15,13 @@ import TunnelCore
     }
     var body: some Scene {
         WindowGroup("TunnelDeck", id: "connections") {
-            ContentView(model: model)
-                .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? .dark : nil)
+            ContentView(model: model, language: language, windows: windows)
+                .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? (CommandLine.arguments.contains("--light-preview") ? .light : .dark) : nil)
                 .onAppear { appDelegate.model = model }
         }
         .defaultSize(width: 780, height: 630)
-        .commands { ConnectionCommands(model: model) }
+        .windowResizability(.contentMinSize)
+        .commands { ConnectionCommands(model: model, windows: windows) }
         Window(L10n.text("window.profile_editor"), id: "profile-editor") {
             ProfileEditor(model: model)
                 .localizedWindowTitle(L10n.text("window.profile_editor"))
@@ -36,19 +38,8 @@ import TunnelCore
                 .localizedWindowTitle(L10n.text("window.diagnostics"))
         }
         .defaultSize(width: 780, height: 460)
-        Window(L10n.text("window.routing"), id: "routing") {
-            RoutingView(model: model)
-                .localizedWindowTitle(L10n.text("window.routing"))
-                .preferredColorScheme(CommandLine.arguments.contains("--design-preview") ? (CommandLine.arguments.contains("--light-preview") ? .light : .dark) : nil)
-        }
-        .defaultSize(width: 960, height: 660)
-        .windowResizability(.contentMinSize)
-        Settings {
-            SettingsView(connection: model.connection, language: language)
-                .localizedWindowTitle(L10n.text("window.settings"))
-        }
         MenuBarExtra {
-            MenuBarActions(model: model)
+            MenuBarActions(model: model, windows: windows)
         } label: {
             Label {
                 Text("TunnelDeck — \(model.connection.state.title)")

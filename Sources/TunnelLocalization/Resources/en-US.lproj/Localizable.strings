@@ -319,7 +319,7 @@
 "sessionsummaryview.select_a_connection_below" = "Select a connection below";
 "sessionsummaryview.switching_connection" = "Switching Connection";
 "sessionsummaryview.vpn_is_off" = "VPN Is Off";
-"settingsview.all_connection_data_including_passwords_and_configurations_is_automatically" = "All connection data, including passwords and configurations, is automatically saved locally on this Mac. One connection can run at a time.";
+"settings.local_storage" = "Connection data, including passwords and configurations, is saved locally on this Mac.";
 "settingsview.configure_shared_rules" = "Configure Shared Rules…";
 "settingsview.network_modules" = "Network Modules";
 "settingsview.not_found" = "Not Found";
@@ -356,6 +356,8 @@
 "xrayprobe.xray_did_not_open_the_local_test_port_see" = "Xray did not open the local test port. See the log.";
 "routing.country_name" = "%1$@";
 "settings.general" = "General";
+"settings.autosave" = "Changes are saved automatically";
+"navigation.back" = "Back";
 "settings.language" = "App Language";
 "language.system" = "System Default";
 "language.russian" = "Русский";

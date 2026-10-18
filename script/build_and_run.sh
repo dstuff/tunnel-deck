@@ -55,8 +55,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleLocalizations</key><array><string>ru</string><string>en-US</string></array>
   <key>CFBundleIconFile</key><string>AppIcon.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>0.2.0</string>
+  <key>CFBundleVersion</key><string>2</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSAppleEventsUsageDescription</key><string>Allow TunnelDeck to request macOS permission to configure a VPN connection.</string>
@@ -91,10 +91,10 @@ case "$MODE" in
     echo "Launched: $APP_BUNDLE"
     ;;
   --preview)
-    /usr/bin/open -n "$APP_BUNDLE" --args --design-preview
+    /usr/bin/open -n "$APP_BUNDLE" --args --design-preview "${@:2}"
     ;;
   --routing-preview)
-    /usr/bin/open -n "$APP_BUNDLE" --args --design-preview --routing-preview
+    /usr/bin/open -n "$APP_BUNDLE" --args --design-preview --routing-preview "${@:2}"
     ;;
   --debug|debug) lldb -- "$CONTENTS/MacOS/TunnelDeck" ;;
   --logs|logs)

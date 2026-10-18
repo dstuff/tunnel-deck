@@ -4,6 +4,8 @@ import TunnelCore
 
 struct RoutingCheckView: View {
     let model: AppModel
+    var width: CGFloat = 570
+    var height: CGFloat = 500
     @Environment(\.dismiss) private var dismiss
     @State private var address = ""
     @State private var result: RoutingAddressInspector.Result?
@@ -12,7 +14,9 @@ struct RoutingCheckView: View {
     @State private var checking = false
     @State private var operation: Task<Void, Never>?
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 0) {
+          ScrollView {
+           VStack(alignment: .leading, spacing: 18) {
             Text(L10n.text("routingcheckview.check_address")).font(.title2.weight(.semibold))
             Text(L10n.text("routingcheckview.checks_the_policy_in_the_editor_the_website_is"))
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -30,8 +34,11 @@ struct RoutingCheckView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let error { Label(error, systemImage: "exclamationmark.circle").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
-            HStack { Spacer(); Button(L10n.text("action.done")) { dismiss() }.keyboardShortcut(.cancelAction) }
-        }.padding(26).frame(width: 570).controlSize(.large)
+           }.frame(maxWidth: .infinity, alignment: .leading).padding(26)
+          }
+          HStack { Spacer(); Button(L10n.text("action.done")) { dismiss() }.keyboardShortcut(.cancelAction) }
+              .padding(.horizontal, 26).padding(.bottom, 20)
+        }.frame(width: width, height: height).controlSize(.regular)
             .onDisappear { operation?.cancel() }
     }
     private func check() {

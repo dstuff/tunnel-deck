@@ -319,7 +319,7 @@
 "sessionsummaryview.select_a_connection_below" = "Выберите подключение ниже";
 "sessionsummaryview.switching_connection" = "Переключаем подключение";
 "sessionsummaryview.vpn_is_off" = "VPN отключён";
-"settingsview.all_connection_data_including_passwords_and_configurations_is_automatically" = "Все данные подключений, включая пароли и конфигурации, автоматически сохраняются локально на этом Mac. Одновременно работает одно подключение.";
+"settings.local_storage" = "Данные подключений, включая пароли и конфигурации, сохраняются локально на этом Mac.";
 "settingsview.configure_shared_rules" = "Настроить общие правила…";
 "settingsview.network_modules" = "Сетевые модули";
 "settingsview.not_found" = "Не найден";
@@ -356,6 +356,8 @@
 "xrayprobe.xray_did_not_open_the_local_test_port_see" = "Xray не открыл локальный порт проверки. См. журнал.";
 "routing.country_name" = "%1$@";
 "settings.general" = "Основные";
+"settings.autosave" = "Изменения сохраняются автоматически";
+"navigation.back" = "Назад";
 "settings.language" = "Язык приложения";
 "language.system" = "Как в системе";
 "language.russian" = "Русский";

@@ -4,6 +4,7 @@ import AppKit
 
 struct MenuBarActions: View {
     let model: AppModel
+    let windows: MainWindowCoordinator
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -24,20 +25,14 @@ struct MenuBarActions: View {
             }
         }.disabled(model.profiles.isEmpty)
         Button(L10n.text("menubaractions.open_tunneldeck")) {
-            NSApp.activate(ignoringOtherApps: true)
-            if let main = NSApp.windows.first(where: { $0.title == "TunnelDeck" && $0.canBecomeMain }) {
-                main.makeKeyAndOrderFront(nil)
-            } else {
-                openWindow(id: "connections")
-            }
+            windows.present { openWindow(id: "connections") }
         }
         Button(L10n.text("menubaractions.add_connection")) {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "add-connection")
         }.disabled(!model.canManageProfiles)
         Button(L10n.text("menubaractions.routing")) {
-            NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "routing")
+            windows.present(.routing) { openWindow(id: "connections") }
         }
         Divider()
         Button(L10n.text("menubaractions.quit_tunneldeck")) { NSApp.terminate(nil) }.keyboardShortcut("q")
@@ -50,8 +45,9 @@ struct MenuBarActions: View {
 
 struct ConnectionCommands: Commands {
     let model: AppModel
+    let windows: MainWindowCoordinator
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
+    @FocusedValue(\.mainNavigation) private var navigation
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -60,7 +56,9 @@ struct ConnectionCommands: Commands {
             }
         }
         CommandGroup(replacing: .appSettings) {
-            Button(L10n.text("menu.settings")) { openSettings() }.keyboardShortcut(",")
+            Button(L10n.text("menu.settings")) {
+                windows.present(.settings) { openWindow(id: "connections") }
+            }.keyboardShortcut(",")
         }
         CommandGroup(replacing: .appVisibility) {
             Button(L10n.text("menu.hide")) { NSApp.hide(nil) }.keyboardShortcut("h")
@@ -78,7 +76,11 @@ struct ConnectionCommands: Commands {
                 .keyboardShortcut("i").disabled(!model.canManageProfiles || !model.hasSelectedProfile)
         }
         CommandGroup(after: .toolbar) {
-            Button(L10n.text("menubaractions.routing")) { openWindow(id: "routing") }
+            Button(L10n.text("navigation.back")) { navigation?.goBack() }
+                .keyboardShortcut("[", modifiers: .command).disabled(navigation?.canGoBack != true)
+            Button(L10n.text("menubaractions.routing")) {
+                windows.present(.routing) { openWindow(id: "connections") }
+            }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Button(L10n.text("window.diagnostics")) { openWindow(id: "diagnostics") }
                 .keyboardShortcut("l", modifiers: [.command, .option])
